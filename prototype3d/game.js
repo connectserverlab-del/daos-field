@@ -19,12 +19,13 @@ function fbm(x, z){ var t=0,a=0.5,f=1; for(var i=0;i<4;i++){ t+=a*vnoise(x*f,z*f
 /* Valley heightfield: rolling hills, a raised rim (bowl), a carved river channel at x≈0 */
 var WATER_Y = -1.4;
 function heightAt(x, z){
-  var n = fbm(x*0.010+11, z*0.010+7)*20;
-  n += fbm(x*0.045, z*0.045)*4.5;
+  var n = fbm(x*0.005+3, z*0.005+9)*22;              // large landforms
+  n += fbm(x*0.010+11, z*0.010+7)*16;                // rolling hills
+  n += fbm(x*0.045, z*0.045)*4.0;                    // fine detail
   var r = Math.sqrt(x*x + z*z);
   n += Math.pow(Math.min(r,520)/300, 2)*70;          // distant rim rises
-  var river = Math.exp(-(x*x)/(2*22*22));            // gaussian channel along z
-  n -= river*7.5;
+  var river = Math.exp(-(x*x)/(2*20*20));            // gaussian channel along z
+  n -= river*9.0;
   return n;
 }
 
@@ -98,6 +99,13 @@ function makeSky(){
   });
   sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 32, 16), mat);
   scene.add(sky);
+  // photoreal cloud band around the horizon (4K sky texture) over the gradient dome
+  if (tex.sky){
+    tex.sky.wrapS = THREE.RepeatWrapping; tex.sky.encoding = THREE.sRGBEncoding;
+    var band = new THREE.Mesh(new THREE.CylinderGeometry(1500, 1500, 820, 64, 1, true),
+      new THREE.MeshBasicMaterial({ map:tex.sky, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.97 }));
+    band.position.y = 120; scene.add(band);
+  }
   // sun sprite (bloom picks it up as god-ray source)
   var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:radialTex("rgba(255,244,214,1)","rgba(255,220,150,0)"),
     color:0xffffff, blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false }));
@@ -106,25 +114,41 @@ function makeSky(){
 
 /* ---------------- terrain ---------------- */
 function makeTerrain(){
-  var SZ=1200, SEG=200;
+  var SZ=1200, SEG=300;
   var geo = new THREE.PlaneGeometry(SZ, SZ, SEG, SEG);
   geo.rotateX(-Math.PI/2);
   var pos = geo.attributes.position;
-  var col = [];
-  var green = new THREE.Color(0x6f8149), rock = new THREE.Color(0x77705d), sand = new THREE.Color(0x9a875c);
-  for (var i=0;i<pos.count;i++){
-    var x=pos.getX(i), z=pos.getZ(i), y=heightAt(x,z);
-    pos.setY(i,y);
-    var c = green.clone();
-    var slope = 1.0 - Math.min(1, Math.max(0, (heightAt(x+2,z)-y)*0.5 + (heightAt(x,z+2)-y)*0.5 + 0.5));
-    if (y > 34) c.lerp(rock, Math.min(1,(y-34)/40));
-    if (y < WATER_Y+1.2) c.lerp(sand, 0.6);
-    col.push(c.r,c.g,c.b);
-  }
-  geo.setAttribute("color", new THREE.Float32BufferAttribute(col,3));
+  for (var i=0;i<pos.count;i++){ pos.setY(i, heightAt(pos.getX(i), pos.getZ(i))); }
   geo.computeVertexNormals();
-  grassMat = new THREE.MeshStandardMaterial({ map:tex.grass||null, vertexColors:true, roughness:1, metalness:0 });
-  if (tex.grass){ tex.grass.wrapS=tex.grass.wrapT=THREE.RepeatWrapping; tex.grass.repeat.set(90,90); }
+  if (tex.grass){ tex.grass.wrapS=tex.grass.wrapT=THREE.RepeatWrapping; tex.grass.repeat.set(64,64); }
+  if (tex.dirt){ tex.dirt.wrapS=tex.dirt.wrapT=THREE.RepeatWrapping; }
+  if (tex.rock){ tex.rock.wrapS=tex.rock.wrapT=THREE.RepeatWrapping; }
+  grassMat = new THREE.MeshStandardMaterial({ map:tex.grass||null, normalMap:tex.grassN||null, roughness:1, metalness:0 });
+  if (grassMat.normalMap) grassMat.normalScale.set(0.6,0.6);
+  // PBR splat: blend grass / dirt / rock by slope, altitude and macro noise
+  grassMat.onBeforeCompile = function(sh){
+    sh.uniforms.tDirt = { value: tex.dirt||tex.grass };
+    sh.uniforms.tRock = { value: tex.rock||tex.grass };
+    sh.vertexShader = "varying float vWy; varying vec2 vWXZ; varying float vUp;\n" +
+      sh.vertexShader.replace("#include <begin_vertex>",
+        "#include <begin_vertex>\n vec4 _wp=modelMatrix*vec4(transformed,1.0); vWy=_wp.y; vWXZ=_wp.xz; vUp=normalize(mat3(modelMatrix)*objectNormal).y;");
+    sh.fragmentShader = "uniform sampler2D tDirt; uniform sampler2D tRock; varying float vWy; varying vec2 vWXZ; varying float vUp;\n" +
+      sh.fragmentShader.replace("#include <map_fragment>",
+        "#ifdef USE_MAP\n" +
+        " vec3 gcol = texture2D( map, vUv ).rgb;\n" +
+        " vec3 dcol = texture2D( tDirt, vUv ).rgb;\n" +
+        " vec3 rcol = texture2D( tRock, vUv*0.55 ).rgb;\n" +
+        " float m = sin(vWXZ.x*0.03)*0.5 + sin(vWXZ.y*0.025+1.7)*0.5; m = m*0.5+0.5;\n" +
+        " float steep = 1.0 - smoothstep(0.60, 0.82, vUp);\n" +
+        " float high  = smoothstep(24.0, 46.0, vWy);\n" +
+        " float low   = smoothstep(1.5, -1.4, vWy);\n" +
+        " vec3 base = mix(gcol, dcol, clamp(low + m*0.16, 0.0, 1.0));\n" +
+        " base = mix(base, rcol, clamp(max(steep, high), 0.0, 1.0));\n" +
+        " base *= (0.9 + 0.13*m);\n" +
+        " diffuseColor.rgb *= base;\n" +
+        "#endif\n");
+  };
+  grassMat.customProgramCacheKey = function(){ return "daoTerrainSplat"; };
   var mesh = new THREE.Mesh(geo, grassMat); mesh.receiveShadow = true; scene.add(mesh);
 }
 
@@ -191,20 +215,29 @@ function makeGrass(){
 
 /* ---------------- trees + rocks ---------------- */
 function scatter(){
-  var trunkMat=new THREE.MeshStandardMaterial({color:0x3b2c1e,roughness:1});
-  var leafMat=new THREE.MeshStandardMaterial({color:0x40693c,roughness:1,flatShading:true});
-  for (var i=0;i<44;i++){
-    var x=(hash2(i,71)-0.5)*380, z=(hash2(i,33)-0.5)*380, r=Math.sqrt(x*x+z*z);
-    var y=heightAt(x,z); if (r<28 || y<WATER_Y+1 || y>60) continue;
+  var trunkMat=new THREE.MeshStandardMaterial({color:0x4a3524,roughness:1});
+  trees=[];
+  for (var i=0;i<74;i++){
+    var x=(hash2(i,71)-0.5)*400, z=(hash2(i,33)-0.5)*400, r=Math.sqrt(x*x+z*z);
+    var y=heightAt(x,z); if (r<26 || y<WATER_Y+1 || y>72) continue;
     var g=new THREE.Group();
-    var hh=6+hash2(i,4)*7;
-    var tr=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.6,hh,5), trunkMat); tr.position.y=hh/2; tr.castShadow=true; g.add(tr);
-    for (var k=0;k<3;k++){ var cr=new THREE.Mesh(new THREE.ConeGeometry(3.2-k*0.7,4.2,6), leafMat);
-      cr.position.y=hh-1+k*2.4; cr.castShadow=true; g.add(cr); }
-    g.position.set(x,y,z); g.scale.setScalar(0.8+hash2(i,6)*0.7); scene.add(g);
+    var hh=8+hash2(i,4)*9;
+    var tr=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.72,hh,6), trunkMat); tr.position.y=hh/2; tr.castShadow=true; g.add(tr);
+    var tint=new THREE.Color().setHSL(0.27+hash2(i,9)*0.07, 0.40, 0.22+hash2(i,2)*0.09);
+    var leafMat=new THREE.MeshStandardMaterial({color:tint,roughness:1,flatShading:true});
+    var layers=4+(i%3);
+    for (var k=0;k<layers;k++){
+      var rad=(3.7 - k*(2.7/layers)) * (0.9+hash2(i+k,5)*0.35);
+      var cr=new THREE.Mesh(new THREE.ConeGeometry(rad, 3.4, 7), leafMat);
+      cr.position.set((hash2(i+k,3)-0.5)*0.5, hh-1.6+k*1.95, (hash2(i+k,7)-0.5)*0.5);
+      cr.rotation.y=hash2(i+k,1)*TAU; cr.castShadow=true; g.add(cr);
+    }
+    g.position.set(x,y,z); g.rotation.z=(hash2(i,8)-0.5)*0.12; g.scale.setScalar(0.9+hash2(i,6)*0.9);
+    g.userData.sway=0.015+hash2(i,4)*0.02; g.userData.ph=hash2(i,2)*TAU; g.userData.baseZ=g.rotation.z;
+    scene.add(g); if (trees.length<90) trees.push(g);
   }
-  var rockMat=new THREE.MeshStandardMaterial({map:tex.rock||null,color:0x8a8478,roughness:1,flatShading:true});
-  for (var j=0;j<70;j++){
+  var rockMat=new THREE.MeshStandardMaterial({map:tex.rock||null,color:0x9a948a,roughness:1,flatShading:true});
+  for (var j=0;j<82;j++){
     var rx=(hash2(j,12)-0.5)*320, rz=(hash2(j,90)-0.5)*320; var ry=heightAt(rx,rz); if (ry<WATER_Y) continue;
     var rk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.8+hash2(j,5)*2.4, 0), rockMat);
     rk.position.set(rx,ry+0.2,rz); rk.rotation.set(hash2(j,1)*TAU,hash2(j,2)*TAU,hash2(j,3)*TAU);
@@ -213,7 +246,7 @@ function scatter(){
 }
 
 /* ---------------- particles: spirit motes + petals + mist ---------------- */
-var motes, petals, mistPlanes=[];
+var motes, petals, mistPlanes=[], trees=[];
 function makeParticles(){
   // motes rising
   var N=1400, g=new THREE.BufferGeometry(), a=new Float32Array(N*3);
@@ -271,28 +304,62 @@ function makePOIs(){
 
 /* ---------------- player (robed cultivator) ---------------- */
 var player = { pos:new THREE.Vector3(0, 0, 8), yaw:0, vel:new THREE.Vector3(), speed:0 };
+/* ---- hero: Nano-Banana spritesheet, chroma-keyed, billboarded ---- */
+var playerSprite, heroMat, HERO_H=5.6;
+var hero = { run:[], attack:[], idle:[], attacking:false, t:0 };
+function keySlice(img, cols){
+  var W=img.width, H=img.height, fw=Math.floor(W/cols), frames=[];
+  for(var c=0;c<cols;c++){
+    var cv=document.createElement("canvas"); cv.width=fw; cv.height=H; var g=cv.getContext("2d");
+    g.drawImage(img, c*fw,0,fw,H, 0,0,fw,H);
+    var id=g.getImageData(0,0,fw,H), d=id.data;
+    for(var i=0;i<d.length;i+=4){ var r=d[i],gr=d[i+1],b=d[i+2];
+      if(gr>55 && gr>r*1.15 && gr>b*1.15){ d[i+3]=0; }        // key green screen + ghosts
+      else if(gr>r && gr>b){ d[i+1]=Math.max(r,b); }          // de-spill green fringe
+    }
+    g.putImageData(id,0,0);
+    var t=new THREE.CanvasTexture(cv); t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; t.needsUpdate=true;
+    frames.push({ tex:t, aspect:fw/H });
+  }
+  return frames;
+}
+function loadHero(cb){
+  var jobs=[["./assets/hero_run.webp",6,"run"],["./assets/hero_attack.webp",5,"attack"],["./assets/hero_idle.webp",1,"idle"]], n=jobs.length;
+  jobs.forEach(function(j){ var im=new Image();
+    im.onload=function(){ try{ hero[j[2]]=keySlice(im,j[1]); }catch(e){} if(--n===0&&cb)cb();
+      if(playerSprite && (j[2]==="idle")) setHeroFrame(hero.idle[0]); };
+    im.onerror=function(){ if(--n===0&&cb)cb(); }; im.src=j[0]; });
+}
+function setHeroFrame(f){ if(!f||!heroMat)return; heroMat.map=f.tex; heroMat.needsUpdate=true; playerSprite.scale.set(HERO_H*f.aspect, HERO_H, 1); }
+function heroAttack(){ if(hero.attack.length && !hero.attacking){ hero.attacking=true; hero.t=0; } }
+function updateHero(dt){
+  if(!heroMat) return;
+  var moving = player.speed>1.3;
+  if(hero.attacking){
+    hero.t+=dt; var idx=Math.floor(hero.t/0.085);
+    if(idx>=hero.attack.length){ hero.attacking=false; hero.t=0; } else setHeroFrame(hero.attack[idx]);
+  }
+  if(!hero.attacking){
+    if(moving && hero.run.length){ hero.t+=dt*(2.4+player.speed*0.16); setHeroFrame(hero.run[Math.floor(hero.t)%hero.run.length]); }
+    else if(hero.idle.length){ hero.t=0; setHeroFrame(hero.idle[0]); }
+    else if(hero.run.length){ setHeroFrame(hero.run[0]); }
+  }
+  playerSprite.rotation.y = Math.atan2(camera.position.x-player.pos.x, camera.position.z-player.pos.z); // Y billboard
+}
 function makePlayer(){
   var R=RACE[chosen];
   playerObj = new THREE.Group();
-  var robeMat=new THREE.MeshStandardMaterial({color:R.robe,roughness:0.8,metalness:0});
-  var robe=new THREE.Mesh(new THREE.CylinderGeometry(0.55,1.15,2.4,12,1,true), robeMat);
-  robe.position.y=1.2; robe.castShadow=true; playerObj.add(robe);
-  var torso=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.55,0.9,10), robeMat); torso.position.y=2.3; torso.castShadow=true; playerObj.add(torso);
-  var sash=new THREE.Mesh(new THREE.TorusGeometry(0.56,0.09,8,16), new THREE.MeshStandardMaterial({color:0x8a2f2a,roughness:0.7}));
-  sash.rotation.x=Math.PI/2; sash.position.y=2.0; playerObj.add(sash);
-  var skin=new THREE.MeshStandardMaterial({color:0xd8b48c,roughness:0.7});
-  var head=new THREE.Mesh(new THREE.SphereGeometry(0.32,16,16), skin); head.position.y=3.0; head.castShadow=true; playerObj.add(head);
-  var hair=new THREE.Mesh(new THREE.SphereGeometry(0.34,12,12,0,TAU,0,Math.PI*0.62), new THREE.MeshStandardMaterial({color:0x1a1512,roughness:0.6}));
-  hair.position.y=3.05; playerObj.add(hair);
-  var bun=new THREE.Mesh(new THREE.SphereGeometry(0.16,10,10), new THREE.MeshStandardMaterial({color:0x1a1512}));
-  bun.position.set(0,3.42,0); playerObj.add(bun);
-  // feet aura ring
+  heroMat = new THREE.MeshBasicMaterial({ transparent:true, alphaTest:0.35, side:THREE.DoubleSide, depthWrite:true });
+  playerSprite = new THREE.Mesh(new THREE.PlaneGeometry(1,1), heroMat);
+  playerSprite.geometry.translate(0,0.5,0);                 // feet at group origin
+  playerSprite.scale.set(HERO_H*0.42, HERO_H, 1);
+  playerObj.add(playerSprite);
+  if(hero.idle.length) setHeroFrame(hero.idle[0]); else if(hero.run.length) setHeroFrame(hero.run[0]);
   auraRing = new THREE.Mesh(new THREE.RingGeometry(0.9,1.5,40),
-    new THREE.MeshBasicMaterial({color:R.aura,transparent:true,opacity:0.32,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false}));
+    new THREE.MeshBasicMaterial({color:R.aura,transparent:true,opacity:0.28,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false}));
   auraRing.rotation.x=-Math.PI/2; auraRing.position.y=0.06; playerObj.add(auraRing);
-  // soft blob shadow
-  var blob=new THREE.Mesh(new THREE.PlaneGeometry(2.4,2.4), new THREE.MeshBasicMaterial({map:radialTex("rgba(0,0,0,0.5)","rgba(0,0,0,0)"),transparent:true,depthWrite:false}));
-  blob.rotation.x=-Math.PI/2; blob.position.y=0.04; playerObj.add(blob);
+  var blob=new THREE.Mesh(new THREE.PlaneGeometry(3.0,3.0), new THREE.MeshBasicMaterial({map:radialTex("rgba(0,0,0,0.55)","rgba(0,0,0,0)"),transparent:true,depthWrite:false}));
+  blob.rotation.x=-Math.PI/2; blob.position.y=0.05; playerObj.add(blob);
   scene.add(playerObj);
   player.pos.set(0, heightAt(0,8), 8);
 }
@@ -326,7 +393,8 @@ var BIND={KeyW:"f",ArrowUp:"f",KeyS:"b",ArrowDown:"b",KeyA:"l",ArrowLeft:"l",Key
 function bindInput(){
   addEventListener("keydown",function(e){ if(BIND[e.code]){keys[BIND[e.code]]=1;e.preventDefault();}
     if(e.code==="ShiftLeft"||e.code==="ShiftRight")keys.run=1;
-    if(e.code==="KeyE"||e.code==="Enter")tryObserve(); });
+    if(e.code==="KeyE")tryObserve();
+    if(e.code==="Space"||e.code==="KeyJ"){ heroAttack(); e.preventDefault(); } });
   addEventListener("keyup",function(e){ if(BIND[e.code])keys[BIND[e.code]]=0;
     if(e.code==="ShiftLeft"||e.code==="ShiftRight")keys.run=0; });
   var cv=renderer.domElement;
@@ -355,7 +423,7 @@ function bindInput(){
     if(!e.touches.length){ /* tap = observe if near */ }
   },{passive:true});
   // tap to observe (center tap)
-  cv.addEventListener("click",function(){ tryObserve(); });
+  cv.addEventListener("click",function(){ if(nearPOI) tryObserve(); else heroAttack(); });
 }
 function padPoll(){
   var gp=(navigator.getGamepads&&navigator.getGamepads()[0]); if(!gp)return;
@@ -405,12 +473,11 @@ function update(dt, t){
   player.pos.x=clamp(player.pos.x,-260,260); player.pos.z=clamp(player.pos.z,-260,260);
   var gy=heightAt(player.pos.x, player.pos.z); player.pos.y=gy;
   // place player, hover + bob + sway
-  var bob=Math.sin(t*6)*0.06*Math.min(1,player.speed*0.2);
-  playerObj.position.set(player.pos.x, player.pos.y+0.15+bob, player.pos.z);
-  var cur=playerObj.rotation.y, tgt=player.yaw;
-  var diff=Math.atan2(Math.sin(tgt-cur),Math.cos(tgt-cur)); playerObj.rotation.y=cur+diff*Math.min(1,dt*8);
-  playerObj.rotation.z=Math.sin(t*3)*0.02 + (moving?player.vel.x*0.006:0);
-  auraRing.material.opacity=0.18+Math.sin(t*2)*0.08; auraRing.scale.setScalar(1+Math.sin(t*2)*0.06);
+  var bob=Math.sin(t*11)*0.05*Math.min(1,player.speed*0.14);
+  playerObj.position.set(player.pos.x, player.pos.y+bob, player.pos.z);
+  playerObj.rotation.set(0,0,0);
+  if(auraRing){ auraRing.material.opacity=(hero.attacking?0.5:0.16)+Math.sin(t*2)*0.08; auraRing.scale.setScalar(1+Math.sin(t*2)*0.06); }
+  updateHero(dt);
   // camera third-person, cinematic
   var desiredDist=camDist+(keys.run&&moving?1.5:0);
   var cx=player.pos.x - Math.sin(camYaw)*Math.cos(camPitch)*desiredDist;
@@ -428,6 +495,7 @@ function update(dt, t){
   // water + grass + particles animation
   if(waterMat)waterMat.uniforms.t.value=t;
   if(grassMat&&grassMat._wind)grassMat._wind.value=t;
+  for(var ti=0;ti<trees.length;ti++){ var tg=trees[ti]; tg.rotation.z=tg.userData.baseZ+Math.sin(t*0.7+tg.userData.ph)*tg.userData.sway; }
   animParticles(dt,t);
   // POI proximity
   nearPOI=null; var best=1e9;
@@ -452,13 +520,36 @@ function animParticles(dt,t){
 
 /* ---------------- assets loading ---------------- */
 var isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints>0;
+/* derive a tangent-space normal map from an albedo's luminance (Sobel, downscaled) */
+function deriveNormal(img, strength){
+  var S=512, c=document.createElement("canvas"); c.width=c.height=S;
+  var g=c.getContext("2d"); g.drawImage(img,0,0,S,S);
+  var src=g.getImageData(0,0,S,S).data, out=g.createImageData(S,S), d=out.data;
+  function L(x,y){ x=(x+S)%S; y=(y+S)%S; var i=(y*S+x)*4; return (src[i]*0.299+src[i+1]*0.587+src[i+2]*0.114)/255; }
+  for(var y=0;y<S;y++)for(var x=0;x<S;x++){
+    var dx=(L(x-1,y)-L(x+1,y))*strength, dy=(L(x,y-1)-L(x,y+1))*strength, nz=1.0;
+    var l=Math.sqrt(dx*dx+dy*dy+nz*nz), i=(y*S+x)*4;
+    d[i]=(dx/l*0.5+0.5)*255; d[i+1]=(dy/l*0.5+0.5)*255; d[i+2]=(nz/l*0.5+0.5)*255; d[i+3]=255;
+  }
+  g.putImageData(out,0,0);
+  var t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.needsUpdate=true; return t;
+}
 function loadTextures(cb){
   var loader=new THREE.TextureLoader();
-  var items=[["grass","./assets/grass_ground.png"],["rock","./assets/cliff_rock.png"]];
-  var remaining=items.length; if(!remaining)cb();
+  var items=[["grass","./assets/grass_ground.webp"],["rock","./assets/cliff_rock.webp"],
+             ["dirt","./assets/dirt_ground.webp"],["sky","./assets/sky_dawn.webp"]];
+  var remaining=items.length;
+  function done(){
+    try{
+      if(tex.grass&&tex.grass.image) tex.grassN=deriveNormal(tex.grass.image,1.7);
+      if(tex.rock&&tex.rock.image)   tex.rockN =deriveNormal(tex.rock.image,2.6);
+    }catch(e){}
+    cb();
+  }
+  if(!remaining)return done();
   items.forEach(function(it){
-    loader.load(it[0+1], function(tx){ tx.encoding=THREE.sRGBEncoding; tex[it[0]]=tx; if(--remaining===0)cb(); },
-      undefined, function(){ if(--remaining===0)cb(); });
+    loader.load(it[1], function(tx){ tx.encoding=THREE.sRGBEncoding; tex[it[0]]=tx; if(--remaining===0)done(); },
+      undefined, function(){ if(--remaining===0)done(); });
   });
 }
 
@@ -506,6 +597,7 @@ function boot(){
   initAudio(); $("audioBtn").onclick=toggleAudio;
   // preload textures, then allow enter
   loadTextures(function(){ /* ready */ });
+  loadHero(function(){ /* hero frames ready */ });
   $("enter").onclick=function(){
     buildWorld();
     var v=$("veil"); v.classList.add("gone");

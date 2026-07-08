@@ -6,8 +6,8 @@ window.STR = {
   enter: "Enter the Valley",
   chooseOrigin: "Choose your origin",
   races: { human:"Human", beast:"Beast", spirit_beast:"Spirit Beast", monster:"Monster" },
-  hintDesktop: "WASD / Arrows to move · drag to look · Shift to glide · E to observe",
-  hintTouch: "Left: move · Right: look · tap a marker to observe",
+  hintDesktop: "WASD / Arrows move · drag look · Shift run · click / Space attack · E observe",
+  hintTouch: "Left stick move · right side look · tap attack · tap marker to observe",
   audioOn: "♪ Music", audioOff: "♪ Muted",
   poi: {
     spirit_vein: { name:"Spirit Vein", lore:"Qi wells up from the earth here. Sects wage wars over veins like this — the lifeblood of cultivation." },
