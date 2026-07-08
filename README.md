@@ -27,6 +27,10 @@ change — before a line of engine code is committed.
   permanence for cash.
 
 ## Building the game
+- [`sim/`](sim/) — **the cultivation system, implemented.** A pure, data-driven, unit-tested
+  reference library (15 Heavenly Cards, Aura calculation, character stats, cultivation experience,
+  realm advancement). Reads `data/`, zero dependencies, 13 passing tests proving the design
+  invariants. Runs in the browser and is the spec for the UE5 GAS build. `cd sim && node test/run.js`.
 - [`engine/`](engine/) — **AAA native-engine handoff package (Unreal Engine 5).** Engine choice,
   project scaffold, system-by-system mappings to engine constructs, character/combat/world pipelines,
   data import, MMO networking, and all AI-generated art organized for import (`engine/art-refs/`).

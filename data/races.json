@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "_comment": "Playable races. statMods multiply derived stats (missing key = 1.0). rareElementBias multiplies rare/epic element draw weights. tribulation multiplies tribulation success chance. Traits are flavor + the mechanical hook.",
+  "races": [
+    { "id": "human", "name": "Human",
+      "statMods": { "comprehension": 1.10, "cultivationSpeed": 1.05 },
+      "trait": "Versatile — no weakness in any cultivation path." },
+    { "id": "beast", "name": "Beast",
+      "statMods": { "vitality": 1.25, "attack": 1.20, "comprehension": 0.90 },
+      "trait": "Body Refinement — physique-based techniques flow easier." },
+    { "id": "spirit_beast", "name": "Spirit Beast",
+      "statMods": { "qi": 1.20, "spirit": 1.20 }, "rareElementBias": 1.8,
+      "trait": "Spirit Affinity — higher chance of rare element cards." },
+    { "id": "monster", "name": "Monster",
+      "statMods": { "attack": 1.30, "vitality": 1.15 }, "tribulation": 0.90,
+      "trait": "Savage Growth — greater raw power at the cost of harsher tribulations." }
+  ]
+}

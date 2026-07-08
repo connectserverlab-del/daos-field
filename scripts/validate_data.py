@@ -76,6 +76,38 @@ def main():
             if ur and ur not in realm_ids:
                 errors.append(f"worlds.json: layer {layer['id']} unlockRealm '{ur}' is not a defined realm")
 
+    # Cultivation-system config (Phase 3): draw / destiny / races
+    draw = load("draw.json")
+    destiny = load("destiny.json")
+    races = load("races.json")
+    if draw is not None and elements is not None:
+        rarity_tiers = set(elements.get("rarityTiers", []))
+        for r in draw.get("drawableRarities", []):
+            if r not in rarity_tiers:
+                errors.append(f"draw.json: drawableRarity '{r}' not in elements.rarityTiers")
+        for r in draw.get("rarityWeights", {}):
+            if r not in rarity_tiers:
+                errors.append(f"draw.json: rarityWeight key '{r}' not in elements.rarityTiers")
+        # at least one drawable element must have positive weight (else Aura can't be computed)
+        weights = draw.get("rarityWeights", {})
+        drawable = [e for e in (elements["elements"] if elements else [])
+                    if e["rarity"] in set(draw.get("drawableRarities", [])) and weights.get(e["rarity"], 0) > 0]
+        if len(drawable) < 2:
+            errors.append("draw.json: fewer than 2 drawable elements with positive weight (Aura draw impossible)")
+    if destiny is not None:
+        gids = [g["g"] for g in destiny.get("grades", [])]
+        if len(gids) != len(set(gids)):
+            errors.append("destiny.json: duplicate grade 'g' values")
+        floor = destiny.get("floorGrade", 1)
+        if floor not in gids:
+            errors.append(f"destiny.json: floorGrade {floor} is not a defined grade")
+        if len(destiny.get("aspects", [])) != 6:
+            errors.append("destiny.json: expected exactly 6 destiny aspects")
+    if races is not None:
+        rids = [r["id"] for r in races.get("races", [])]
+        if len(rids) != len(set(rids)):
+            errors.append("races.json: duplicate race ids")
+
     if errors:
         print("DATA VALIDATION FAILED:")
         for e in errors:
