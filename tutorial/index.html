@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>DAO'S FIELD — Tutorial Region</title>
+<style>
+  :root{--ivory:#efe6d2;--ivory2:#cfc7b4;--bronze:#c79a5b;--amber:#e8b84a;--ink:#07070a;
+    --panel:rgba(18,15,11,.78);--line:rgba(199,154,91,.34);
+    --serif:"Cormorant Garamond","Georgia","Songti SC","STSong","Times New Roman",serif}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--ink);color:var(--ivory);font-family:var(--serif);overflow:hidden;touch-action:none;user-select:none}
+  canvas{display:block;position:fixed;inset:0}
+  #cine .bar{position:fixed;left:0;right:0;height:5vh;background:#000;z-index:5}
+  #cine .top{top:0}#cine .bottom{bottom:0}
+  #vig{position:fixed;inset:0;z-index:5;pointer-events:none;background:radial-gradient(130% 110% at 50% 46%,transparent 58%,rgba(0,0,0,.42) 100%)}
+  /* objective + vitals (top-left) */
+  #tracker{position:fixed;top:calc(5vh + 12px);left:14px;z-index:8;width:260px;text-shadow:0 1px 6px #000}
+  #tracker .qt{color:var(--amber);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+  #tracker .qo{color:var(--ivory);font-size:15px;line-height:1.35;margin-top:2px}
+  #tracker .qp{color:var(--ivory2);font-size:12px;margin-top:2px}
+  #vitals{position:fixed;top:calc(5vh + 92px);left:14px;z-index:8;width:200px}
+  .bar2{height:11px;border:1px solid rgba(239,230,210,.3);border-radius:6px;overflow:hidden;background:rgba(0,0,0,.45);margin-bottom:5px;position:relative}
+  .bar2>i{display:block;height:100%;transition:width .2s}
+  .bar2.hp>i{background:linear-gradient(90deg,#c0392b,#e8623a)}.bar2.qi>i{background:linear-gradient(90deg,#2f6fd0,#3ac9c0)}
+  .bar2 span{position:absolute;right:6px;top:-2px;font-size:9px;letter-spacing:.12em;color:#efe6d2;text-shadow:0 1px 2px #000}
+  #badge{position:fixed;top:calc(5vh + 138px);left:14px;z-index:8;font-size:12px;color:var(--ivory2);letter-spacing:.05em;text-shadow:0 1px 5px #000}
+  #badge b{color:var(--ivory)}
+  /* interaction prompt */
+  #prompt{position:fixed;bottom:calc(5vh + 84px);left:50%;transform:translateX(-50%);z-index:8;
+    color:var(--amber);letter-spacing:.08em;font-size:15px;text-shadow:0 0 14px rgba(232,184,74,.4),0 2px 6px #000;opacity:0;transition:.25s;white-space:nowrap}
+  #tech{position:fixed;bottom:calc(5vh + 12px);right:14px;z-index:8;color:var(--ivory2);font-size:12px;text-shadow:0 1px 6px #000;opacity:0;transition:.3s}
+  #tech b{color:var(--amber)}
+  #hint{position:fixed;bottom:calc(5vh + 12px);left:50%;transform:translateX(-50%);z-index:7;font-size:12px;color:#b7ae9a;text-shadow:0 1px 6px #000;opacity:.8;text-align:center;padding:0 12px}
+  /* banner */
+  #banner{position:fixed;top:30%;left:50%;transform:translate(-50%,-50%);z-index:9;text-align:center;pointer-events:none;opacity:0;transition:opacity .5s}
+  #banner .bk{letter-spacing:.4em;text-transform:uppercase;color:var(--bronze);font-size:12px}
+  #banner .bt{font-size:clamp(26px,5vw,44px);letter-spacing:.1em;color:var(--ivory);text-shadow:0 3px 24px #000;margin-top:3px}
+  /* dialogue */
+  #dlg{position:fixed;left:50%;bottom:calc(5vh + 18px);transform:translateX(-50%);z-index:12;width:min(680px,94vw);
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:none;backdrop-filter:blur(4px)}
+  #dlg.on{display:flex;gap:14px}
+  #dlg .por{width:74px;height:74px;border-radius:4px;border:1px solid var(--line);background:#1a1510 center/cover;flex-shrink:0}
+  #dlg .nm{color:var(--amber);letter-spacing:.1em;font-size:14px;text-transform:uppercase}
+  #dlg .tx{color:var(--ivory);font-size:16px;line-height:1.5;margin-top:4px}
+  #dlg .cont{color:var(--ivory2);font-size:12px;margin-top:8px;letter-spacing:.1em}
+  /* inventory */
+  #inv{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:13;width:min(420px,92vw);
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:none;backdrop-filter:blur(5px)}
+  #inv.on{display:block}
+  #inv h3{margin:0 0 10px;letter-spacing:.2em;text-transform:uppercase;font-size:13px;color:var(--bronze);font-weight:600}
+  #inv .it{display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid rgba(199,154,91,.14);color:#e6dcc6;font-size:14px}
+  #inv .it .q{color:var(--amber)}
+  /* awakening overlay */
+  #awaken{position:fixed;inset:0;z-index:20;background:radial-gradient(120% 100% at 50% 40%,rgba(20,30,34,.92),rgba(4,5,8,.97));
+    display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;transition:opacity .8s}
+  #awaken.on{display:flex}
+  #awaken .k{letter-spacing:.5em;text-transform:uppercase;color:var(--bronze);font-size:12px}
+  #awaken h1{font-size:clamp(26px,5vw,44px);letter-spacing:.14em;margin:.15em 0 .1em;text-shadow:0 3px 24px #000}
+  #cardrow{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:640px;margin:14px 0}
+  .hcard{width:44px;height:62px;border-radius:4px;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:linear-gradient(180deg,#211b14,#14110d);opacity:0;transform:translateY(8px) scale(.9);transition:.4s}
+  .hcard.show{opacity:1;transform:none}
+  .hcard .g{font-size:17px;line-height:1;text-shadow:0 0 10px currentColor}
+  .hcard .n{font-size:8px;margin-top:3px;letter-spacing:.02em;color:#cfc7b4;text-align:center}
+  #auraReveal{margin:6px 0;font-size:clamp(28px,6vw,52px);letter-spacing:.14em;opacity:0;transition:.8s;text-shadow:0 0 30px var(--ac,#fff)}
+  #auraSub{color:var(--ivory2);max-width:56ch;font-size:15px;line-height:1.55;opacity:0;transition:.8s;margin-top:4px}
+  #awaken .btn,#veil .btn,.ui-btn{cursor:pointer;font-family:var(--serif);background:linear-gradient(180deg,rgba(199,154,91,.22),rgba(199,154,91,.05));
+    border:1px solid var(--bronze);color:var(--ivory);letter-spacing:.14em;text-transform:uppercase;border-radius:2px;padding:.6em 1.6em;font-size:14px;margin-top:16px;pointer-events:auto}
+  /* buttons */
+  .ui-btn{position:fixed;z-index:8;padding:.45em .9em;font-size:12px;letter-spacing:.08em;text-transform:none;margin:0}
+  #invBtn{top:calc(5vh + 8px);right:96px}#audioBtn{top:calc(5vh + 8px);right:12px}#resetBtn{top:calc(5vh + 8px);right:170px}
+  /* touch */
+  .stick{position:fixed;bottom:calc(5vh + 22px);left:22px;width:112px;height:112px;border-radius:50%;border:1px solid rgba(239,230,210,.25);z-index:7;display:none}
+  .stick .nub{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(239,230,210,.18);border:1px solid rgba(239,230,210,.4)}
+  #actBtn{position:fixed;bottom:calc(5vh + 40px);right:26px;width:78px;height:78px;border-radius:50%;border:1px solid var(--bronze);background:rgba(199,154,91,.16);color:var(--ivory);z-index:7;display:none;font-size:12px;letter-spacing:.1em;align-items:center;justify-content:center}
+  body.touch .stick,body.touch #actBtn{display:flex}
+  #dev{position:fixed;top:calc(5vh + 4px);left:6px;color:#6f6;font:11px monospace;z-index:9;display:none}
+  /* loading */
+  #veil{position:fixed;inset:0;z-index:30;background:radial-gradient(120% 100% at 50% 30%,#1a2b30,#05060a);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:opacity 1s;padding:24px}
+  #veil.gone{opacity:0;pointer-events:none}
+  #veil h1{font-size:clamp(38px,9vw,80px);letter-spacing:.15em;margin:.1em 0;font-weight:600;text-shadow:0 3px 26px #000}
+  #veil .k{letter-spacing:.45em;text-transform:uppercase;color:var(--bronze);font-size:12px}
+  #veil .sub{color:#cfc7b4;font-size:15px;letter-spacing:.08em;margin-top:.4em;max-width:60ch}
+  #veil .tip{color:#8a8172;font-size:12px;margin-top:18px;letter-spacing:.04em;max-width:60ch;min-height:2.6em}
+  #loadbar{margin-top:14px;width:min(320px,70vw);height:4px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden}#loadbar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--bronze),var(--amber));transition:width .3s}
+  #foot{position:fixed;bottom:4px;left:0;right:0;z-index:20;text-align:center;color:#8a8172;font-size:11px;letter-spacing:.06em;opacity:.55}
+</style>
+</head>
+<body>
+<div id="tracker"><div class="qt"></div><div class="qo"></div><div class="qp"></div></div>
+<div id="vitals"><div class="bar2 hp"><i></i><span>HP</span></div><div class="bar2 qi"><i></i><span>QI</span></div></div>
+<div id="badge"></div>
+<div id="prompt"></div>
+<div id="tech"></div>
+<div id="hint"></div>
+<div id="banner"><div class="bk"></div><div class="bt"></div></div>
+<div id="dlg"><div class="por"></div><div><div class="nm"></div><div class="tx"></div><div class="cont"></div></div></div>
+<div id="inv"><h3>Inventory</h3><div id="invlist"></div></div>
+<div id="awaken">
+  <div class="k">The Dao Tree Chooses</div><h1>Heavenly Card Awakening</h1>
+  <div id="cardrow"></div>
+  <div id="auraReveal"></div><div id="auraSub"></div>
+  <button class="btn" id="awakenClose">Accept Your Fate</button>
+</div>
+<div id="cine"><div class="bar top"></div><div class="bar bottom"></div></div>
+<div id="vig"></div>
+<div id="dev"></div>
+<div class="stick" id="stickL"><div class="nub"></div></div>
+<div id="actBtn">✦</div>
+<button class="ui-btn" id="resetBtn">↺ New Soul</button>
+<button class="ui-btn" id="invBtn">Bag (I)</button>
+<button class="ui-btn" id="audioBtn">♪ Music</button>
+<div id="veil">
+  <div class="k">Phase 2 Tutorial Region</div><h1>DAO'S FIELD</h1>
+  <div class="sub">Awaken beneath the Dao Tree. Draw your fate. Walk the first steps of cultivation.</div>
+  <div id="loadbar"><i></i></div><div class="tip"></div>
+</div>
+<div id="foot"></div>
+
+<script src="./vendor/three.min.js"></script>
+<script src="./vendor/shaders/CopyShader.js"></script>
+<script src="./vendor/shaders/LuminosityHighPassShader.js"></script>
+<script src="./vendor/shaders/FXAAShader.js"></script>
+<script src="./vendor/postprocessing/EffectComposer.js"></script>
+<script src="./vendor/postprocessing/RenderPass.js"></script>
+<script src="./vendor/postprocessing/ShaderPass.js"></script>
+<script src="./vendor/postprocessing/MaskPass.js"></script>
+<script src="./vendor/postprocessing/UnrealBloomPass.js"></script>
+<script src="./vendor/loaders_GLTFLoader.js"></script>
+<script type="module" src="./game.js"></script>
+</body>
+</html>

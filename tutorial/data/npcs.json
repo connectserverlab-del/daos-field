@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "_comment": "Village NPCs. pos = world [x,z]. dialogue lines are data-driven; the Elder uses conditional lines keyed by aura tier + dominant element (game.js picks the matching one, falling back to default).",
+  "npcs": [
+    {
+      "id": "elder", "name": "Village Elder", "portrait": "./assets/npc_elder.png",
+      "pos": [16, 44], "robe": "#cdba90",
+      "role": "Introduces cultivation, reacts to your awakening, opens the path.",
+      "dialogue": {
+        "default": [
+          "So the Dao Tree has chosen you, child. I felt the qi stir from my hearth.",
+          "Your aura is the measure of your *potential* — not your strength today. Even a Red-aura mortal has toppled White-aura geniuses through nothing but stubborn effort.",
+          "Prove it. Beyond the bridge lies the Whispering Forest — gather three spirit herbs, and beware the beast that stalks there."
+        ],
+        "byAura": {
+          "white": "White aura... in all my years I have never seen it. The heavens themselves are watching you. Do not let it make you arrogant — potential unspent is worth nothing.",
+          "purple": "Purple qi from the east — a genius's mark. The sects will come sniffing soon enough.",
+          "red": "A Red aura. Humble beginnings. Good — the diligent red flame outlasts the lazy white star. I have seen it happen."
+        },
+        "byElement": {
+          "fire": "A Fire root — destruction and forging both. The Alchemist will want words with you.",
+          "water": "Water flows and endures. A patient Dao. It suits the long road ahead.",
+          "gold": "A Gold root — the sword's own element. The Blacksmith's craft will call to you.",
+          "wood": "Wood — life and growth. The herbs of the forest will answer your hand.",
+          "earth": "Earth — the unmoving mountain. Few can break a cultivator of your foundation."
+        }
+      }
+    },
+    { "id": "alchemist", "name": "Alchemist Bai", "portrait": "./assets/npc_alchemist.png",
+      "pos": [-14, 52], "robe": "#bcc9c6",
+      "role": "Herbs, pills, and the first Foundation Pill.",
+      "dialogue": { "default": [
+        "Herbs, pills, poisons — I trade in all three. Bring me spirit herbs and I will refine you a Foundation Pill.",
+        "No, you need not hunt a high Heavenly Fire yet — our village flame will do for a mortal's first pill. That reckoning comes later."
+      ] } },
+    { "id": "blacksmith", "name": "Blacksmith Gang", "portrait": "./assets/npc_blacksmith.png",
+      "pos": [40, 56], "robe": "#8a6a3a",
+      "role": "Weapons, repair, forging (prototype).",
+      "dialogue": { "default": [
+        "A cultivator without a blade is half a cultivator. This iron sword is cheap — take it.",
+        "Higher grades need spirit steel and a true Heavenly Fire. Come back when you've the qi to wield them."
+      ] } },
+    { "id": "merchant", "name": "Merchant Liu", "portrait": null,
+      "pos": [30, 40], "robe": "#9a7d4a",
+      "role": "Buys/sells supplies; introduces currency.",
+      "dialogue": { "default": [
+        "Spirit stones for goods, goods for spirit stones — the oldest Dao of all!",
+        "Gather anything you don't need and I'll give you a fair price. Fair-ish."
+      ] } },
+    { "id": "recruiter", "name": "Sect Envoy Mo", "portrait": null,
+      "pos": [8, 66], "robe": "#3a4a5a",
+      "role": "Explains sects, reputation, element compatibility (prototype).",
+      "dialogue": { "default": [
+        "The great sects watch the Dao Tree's choosings. Aura, element, destiny — all decide which gate will open to you.",
+        "Build your name. When your reputation reaches us, the entrance examinations will follow. For now — grow."
+      ] } }
+  ]
+}

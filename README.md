@@ -27,6 +27,11 @@ change — before a line of engine code is committed.
   permanence for cash.
 
 ## Building the game
+- [`tutorial/`](tutorial/) — **playable integrated tutorial region.** The full first-hour loop:
+  Dao Tree awakening (15 cards + aura, via `sim/`) → Village Elder → gather herbs → fight a spirit
+  beast → Alchemist pill → cultivate/breakthrough → first elemental technique. Reuses the 3D world,
+  combat sprites, and the tested cultivation engine; data-driven quests/NPCs; saves to localStorage.
+  Verified end-to-end in headless WebGL. See [`tutorial/README.md`](tutorial/README.md).
 - [`sim/`](sim/) — **the cultivation system, implemented.** A pure, data-driven, unit-tested
   reference library (15 Heavenly Cards, Aura calculation, character stats, cultivation experience,
   realm advancement). Reads `data/`, zero dependencies, 13 passing tests proving the design
