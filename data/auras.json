@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "_comment": "Aura = POTENTIAL (growth velocity), not raw power. Bonuses front-load early and TAPER at higher realms so a diligent low-aura player can reach the ceiling (design-review issue #2). 'auraFromDuplicates' maps how many duplicate element cards (of 9) yield each tier.",
+  "convergenceRule": {
+    "invariant": "growth-gap from aura must shrink as realm increases and be closable by effort/consumables",
+    "monitored": true,
+    "catchUpFaucets": ["rested_growth", "mentor_bonus", "low_aura_only_consumables"]
+  },
+  "auraFromDuplicates": {
+    "2": "red",
+    "3": "orange",
+    "4": "yellow",
+    "5": "green",
+    "6": "teal",
+    "7": "blue",
+    "8": "purple",
+    "9": "white"
+  },
+  "tiers": [
+    { "id": "red",    "order": 1, "cultivationSpeedMult": 1.05, "daoComprehensionMult": 1.03, "craftingPotentialMult": 1.02, "tribulationSuccessBonus": 0.01, "highRealmTaper": 0.90 },
+    { "id": "orange", "order": 2, "cultivationSpeedMult": 1.10, "daoComprehensionMult": 1.06, "craftingPotentialMult": 1.05, "tribulationSuccessBonus": 0.02, "highRealmTaper": 0.88 },
+    { "id": "yellow", "order": 3, "cultivationSpeedMult": 1.16, "daoComprehensionMult": 1.10, "craftingPotentialMult": 1.08, "tribulationSuccessBonus": 0.03, "highRealmTaper": 0.86 },
+    { "id": "green",  "order": 4, "cultivationSpeedMult": 1.23, "daoComprehensionMult": 1.14, "craftingPotentialMult": 1.12, "tribulationSuccessBonus": 0.04, "highRealmTaper": 0.84 },
+    { "id": "teal",   "order": 5, "cultivationSpeedMult": 1.31, "daoComprehensionMult": 1.19, "craftingPotentialMult": 1.16, "tribulationSuccessBonus": 0.05, "highRealmTaper": 0.82 },
+    { "id": "blue",   "order": 6, "cultivationSpeedMult": 1.40, "daoComprehensionMult": 1.25, "craftingPotentialMult": 1.21, "tribulationSuccessBonus": 0.06, "highRealmTaper": 0.80 },
+    { "id": "purple", "order": 7, "cultivationSpeedMult": 1.50, "daoComprehensionMult": 1.32, "craftingPotentialMult": 1.27, "tribulationSuccessBonus": 0.07, "highRealmTaper": 0.78 },
+    { "id": "pink",   "order": 8, "cultivationSpeedMult": 1.62, "daoComprehensionMult": 1.40, "craftingPotentialMult": 1.34, "tribulationSuccessBonus": 0.08, "highRealmTaper": 0.76 },
+    { "id": "white",  "order": 9, "cultivationSpeedMult": 1.75, "daoComprehensionMult": 1.50, "craftingPotentialMult": 1.42, "tribulationSuccessBonus": 0.10, "highRealmTaper": 0.74 }
+  ],
+  "_taperNote": "Effective multiplier at a given realm = 1 + (tierMult - 1) * (highRealmTaper ^ realmIndex). Higher realms erode the aura advantage, keeping the ceiling reachable by effort. Tune from live telemetry against convergenceRule.invariant."
+}

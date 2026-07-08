@@ -1,0 +1,30 @@
+name: validate-data
+
+# Guardrail: no malformed data-driven config reaches a game server.
+# This is what makes "add content without rewrites" safe — content PRs are
+# gated on schema + cross-file integrity validation.
+
+on:
+  push:
+    paths:
+      - "data/**"
+      - "scripts/validate_data.py"
+      - ".github/workflows/validate-data.yml"
+  pull_request:
+    paths:
+      - "data/**"
+      - "scripts/validate_data.py"
+      - ".github/workflows/validate-data.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validator deps
+        run: pip install jsonschema
+      - name: Validate data-driven config
+        run: python3 scripts/validate_data.py
