@@ -1,0 +1,9 @@
+id,role,type,description,size/ratio,style_line_ref,source
+bg_dawn_mountains,menu/title screen background,background,vast misty immortal cultivation mountains at dawn with floating jade peaks and distant pagoda,16:9,cinematic-semi-realism-formula,generate
+bg_world1,Human World I entry vista,background,tranquil mortal valley village beneath towering spirit mountains with rice terraces and river in qi mist,16:9,cinematic-semi-realism-formula,generate
+race_human,race select portrait,sprite/portrait,photoreal gritty human cultivator (Blood Message reference-guided), weathered skin front-facing bust,1:1,cinematic-semi-realism-formula,generate
+race_beast,race select portrait,sprite/portrait,photoreal gritty beast-race cultivator, feline traits, reference-guided front-facing bust,1:1,cinematic-semi-realism-formula,generate
+race_spirit_beast,race select portrait,sprite/portrait,photoreal gritty spirit-beast cultivator, fox-deer traits, reference-guided front-facing bust,1:1,cinematic-semi-realism-formula,generate
+race_monster,race select portrait,sprite/portrait,photoreal gritty monster-race cultivator, scaled skin crimson eyes, reference-guided front-facing bust,1:1,cinematic-semi-realism-formula,generate
+card_back,Heavenly Card back face,ui,ornate dao emblem card back with swirling qi and celestial border in ivory bronze on lacquer,1:1,cinematic-semi-realism-formula,generate
+aura_glow,tintable aura reveal halo (screen-blended),ui/effect,radiant circular qi aura halo with concentric luminous rings on pure black,1:1,cinematic-semi-realism-formula,generate

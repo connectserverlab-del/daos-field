@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DAO'S FIELD — A Cultivation Awakening</title>
+<style>
+  :root{
+    --ivory:#efe6d2; --ivory-dim:#c9bfa6; --bronze:#c79a5b; --bronze-deep:#8a6a3a;
+    --lacquer:#14110d; --lacquer-2:#211b14; --teal:#3ac9c0; --amber:#e8b84a;
+    --ink:#0c0a08; --panel:rgba(20,16,12,.72); --line:rgba(199,154,91,.35);
+    --serif:"Cormorant Garamond","Georgia","Songti SC","STSong","Times New Roman",serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--ink);color:var(--ivory);
+    font-family:var(--serif);-webkit-font-smoothing:antialiased;overflow:hidden}
+  #app{position:fixed;inset:0;overflow:hidden}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+    justify-content:center;padding:max(18px,env(safe-area-inset-top)) 18px 24px;
+    opacity:0;transition:opacity .6s ease}
+  .screen.active{display:flex;opacity:1}
+  .bg{position:absolute;inset:0;background-size:cover;background-position:center;
+    filter:saturate(1.02);z-index:0}
+  .bg::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(120% 90% at 50% 20%,transparent 30%,rgba(6,5,4,.55) 78%,rgba(6,5,4,.9) 100%)}
+  .veil{position:absolute;inset:0;background:linear-gradient(rgba(8,6,4,.35),rgba(8,6,4,.62));z-index:0}
+  .stage{position:relative;z-index:2;width:100%;max-width:1040px;margin:0 auto;
+    display:flex;flex-direction:column;align-items:center;text-align:center}
+  h1{font-size:clamp(38px,9vw,86px);letter-spacing:.14em;margin:.1em 0 0;font-weight:600;
+    color:var(--ivory);text-shadow:0 2px 24px rgba(0,0,0,.7),0 0 40px rgba(232,184,74,.15)}
+  h2{font-size:clamp(22px,4.6vw,40px);letter-spacing:.1em;margin:.2em 0;font-weight:600}
+  .kicker{letter-spacing:.42em;text-transform:uppercase;font-size:clamp(10px,2.4vw,13px);
+    color:var(--bronze);margin-bottom:.4em}
+  .lead{max-width:56ch;color:var(--ivory-dim);font-size:clamp(15px,2.5vw,19px);line-height:1.6;margin:.6em auto 0}
+  .hint{color:var(--ivory-dim);font-size:clamp(12px,2.2vw,15px);letter-spacing:.02em;margin:.2em 0 1.1em;opacity:.85}
+  .btn{appearance:none;cursor:pointer;font-family:var(--serif);font-size:clamp(15px,2.6vw,19px);
+    letter-spacing:.16em;text-transform:uppercase;color:var(--ivory);
+    background:linear-gradient(180deg,rgba(199,154,91,.22),rgba(199,154,91,.06));
+    border:1px solid var(--bronze);border-radius:2px;padding:.72em 1.7em;margin-top:.6em;
+    transition:.25s;backdrop-filter:blur(2px);position:relative}
+  .btn:hover,.btn:focus-visible{background:linear-gradient(180deg,rgba(232,184,74,.4),rgba(199,154,91,.14));
+    box-shadow:0 0 26px rgba(232,184,74,.28);outline:none;transform:translateY(-1px)}
+  .btn:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--ivory-dim);letter-spacing:.1em;
+    text-transform:none;font-size:13px;padding:.5em 1.1em}
+  .divider{width:min(280px,60vw);height:1px;margin:1em auto;
+    background:linear-gradient(90deg,transparent,var(--bronze),transparent);opacity:.7}
+
+  /* Race select */
+  .cards-row{display:flex;gap:clamp(8px,1.6vw,18px);flex-wrap:wrap;justify-content:center;margin-top:.4em}
+  .race{width:clamp(140px,20vw,190px);background:var(--panel);border:1px solid var(--line);
+    border-radius:4px;overflow:hidden;cursor:pointer;transition:.28s;position:relative}
+  .race:hover,.race.sel{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber),0 10px 40px rgba(0,0,0,.5);transform:translateY(-4px)}
+  .race .portrait{width:100%;aspect-ratio:1;background:#1a1510 center/cover;filter:saturate(1.03)}
+  .race .rname{font-size:clamp(17px,2.6vw,22px);letter-spacing:.12em;padding:.5em .4em .1em}
+  .race .rtrait{font-size:11.5px;color:var(--teal);padding:0 .8em .3em;letter-spacing:.03em;min-height:2.4em}
+  .race.sel::after{content:"✦";position:absolute;top:6px;right:9px;color:var(--amber);font-size:16px}
+  .racedesc{min-height:3.2em;max-width:52ch;color:var(--ivory-dim);margin:.9em auto 0;font-size:clamp(13px,2.3vw,16px);line-height:1.55}
+
+  /* Draw */
+  .deck{display:grid;grid-template-columns:repeat(5,1fr);gap:clamp(6px,1.2vw,12px);
+    width:min(680px,94vw);margin:.3em auto}
+  .deck.destiny{grid-template-columns:repeat(6,1fr);width:min(560px,94vw);margin-top:.5em}
+  .lbl{letter-spacing:.28em;text-transform:uppercase;font-size:11px;color:var(--bronze);margin:.7em 0 .1em}
+  .card{aspect-ratio:5/7;border-radius:5px;position:relative;cursor:pointer;
+    transform-style:preserve-3d;transition:transform .5s cubic-bezier(.2,.7,.2,1);perspective:600px}
+  .card .face{position:absolute;inset:0;border-radius:5px;backface-visibility:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border:1px solid var(--line);overflow:hidden}
+  .card .back{background:#0f0c08 center/cover;color:transparent}
+  .card .front{transform:rotateY(180deg);background:linear-gradient(180deg,var(--lacquer-2),var(--lacquer));
+    padding:4px;text-align:center}
+  .card.flipped{transform:rotateY(180deg)}
+  .card .glyph{font-size:clamp(18px,4.4vw,30px);line-height:1;text-shadow:0 0 14px currentColor}
+  .card .cname{font-size:clamp(9px,1.9vw,12.5px);letter-spacing:.06em;margin-top:.35em;color:var(--ivory)}
+  .card .cgrade{font-size:clamp(8px,1.7vw,10.5px);letter-spacing:.1em;margin-top:.15em;text-transform:uppercase}
+  .card.pulse{animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 rgba(232,184,74,0)}50%{box-shadow:0 0 18px rgba(232,184,74,.5)}}
+
+  /* Aura */
+  .aura-wrap{position:relative;width:min(360px,74vw);aspect-ratio:1;display:flex;align-items:center;justify-content:center;margin:.2em auto}
+  .aura-color{position:absolute;inset:6%;border-radius:50%;
+    background:radial-gradient(circle,var(--ac) 0%,rgba(0,0,0,0) 66%);filter:blur(3px);animation:breathe 3.6s ease-in-out infinite}
+  .aura-tex{position:absolute;inset:0;background:center/contain no-repeat;mix-blend-mode:screen;opacity:.9}
+  .aura-core{position:relative;z-index:2;font-size:clamp(30px,7vw,54px);letter-spacing:.1em;color:#fff;
+    text-shadow:0 0 24px var(--ac),0 0 60px var(--ac)}
+  @keyframes breathe{0%,100%{transform:scale(.97);opacity:.85}50%{transform:scale(1.05);opacity:1}}
+  .auraname{font-size:clamp(24px,5vw,40px);letter-spacing:.14em;color:var(--ac);text-shadow:0 0 30px var(--ac)}
+  .grants{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:.7em 0}
+  .grant{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:.5em .9em;min-width:104px}
+  .grant b{display:block;font-size:clamp(18px,3.4vw,24px);color:var(--amber)}
+  .grant span{font-size:11px;letter-spacing:.06em;color:var(--ivory-dim);text-transform:uppercase}
+
+  /* Summary */
+  .summary-grid{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:clamp(14px,3vw,30px);
+    align-items:center;width:min(880px,96vw);margin:.4em auto;text-align:left}
+  .sum-portrait{aspect-ratio:1;border-radius:5px;border:1px solid var(--amber);background:#1a1510 center/cover;
+    box-shadow:0 0 40px rgba(0,0,0,.6)}
+  .sum-badge{display:inline-flex;align-items:center;gap:8px;margin:.1em 0 .5em;font-size:clamp(20px,3.6vw,28px);letter-spacing:.08em}
+  .dot{width:.7em;height:.7em;border-radius:50%;box-shadow:0 0 12px currentColor}
+  .aff-row{display:flex;gap:7px;flex-wrap:wrap;margin:.3em 0 .8em}
+  .aff{border:1px solid var(--line);border-radius:20px;padding:.22em .7em;font-size:13px;letter-spacing:.04em}
+  .aff.dom{border-color:var(--amber);color:var(--amber)}
+  .destiny-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:.3em}
+  .dcell{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:.5em .6em;display:flex;align-items:center;gap:8px}
+  .dcell .di{font-size:20px;opacity:.9}
+  .dcell .dk{font-size:11px;color:var(--ivory-dim);letter-spacing:.05em;text-transform:uppercase}
+  .dcell .dv{font-size:15px;letter-spacing:.05em}
+
+  /* World / cultivation */
+  .world-panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    padding:clamp(14px,3vw,26px);width:min(620px,96vw);backdrop-filter:blur(3px)}
+  .realm-line{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4em}
+  .realm-line .rl{font-size:clamp(20px,3.6vw,26px);letter-spacing:.1em}
+  .realm-line .ly{color:var(--bronze);letter-spacing:.18em;text-transform:uppercase;font-size:12px}
+  .bar{height:16px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:rgba(0,0,0,.4);position:relative}
+  .bar > i{display:block;height:100%;width:0;border-radius:10px;
+    background:linear-gradient(90deg,var(--ac,#54c07a),var(--amber));transition:width .12s linear;box-shadow:0 0 16px var(--ac)}
+  .stat-line{display:flex;justify-content:space-between;color:var(--ivory-dim);font-size:13px;margin:.5em 0 0;letter-spacing:.04em}
+  .world-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:1em}
+  .note{color:var(--teal);font-size:13px;letter-spacing:.03em;margin-top:.8em;min-height:1.4em;transition:.3s}
+  .flash{animation:flash .9s ease}
+  @keyframes flash{0%{color:var(--amber);text-shadow:0 0 24px var(--amber)}100%{color:var(--teal);text-shadow:none}}
+
+  .foot{position:absolute;bottom:8px;left:0;right:0;z-index:3;text-align:center;
+    color:var(--ivory-dim);font-size:11px;letter-spacing:.08em;opacity:.6;padding:0 12px}
+  .topnav{position:absolute;top:10px;right:12px;z-index:5}
+  @media (max-width:560px){.summary-grid{grid-template-columns:1fr;text-align:center}
+    .aff-row{justify-content:center}.destiny-row{grid-template-columns:repeat(2,1fr)}
+    .sum-portrait{max-width:180px;margin:0 auto}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="topnav"><button class="btn ghost" id="restart" hidden>↺</button></div>
+<div class="foot" id="foot"></div>
+
+<script type="module">
+import { STR } from "./strings.js";
+import { RACES, ELEMENTS, AURA_TIERS, DESTINY_ASPECTS, DESTINY_GRADES, REALM } from "./data.js";
+
+/* ---------- seeded RNG (deterministic per draw; §12 determinism) ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng = mulberry32((Math.random()*1e9)>>>0);
+const pickWeighted=(arr)=>{const tot=arr.reduce((s,e)=>s+e.weight,0);let r=rng()*tot;
+  for(const e of arr){if((r-=e.weight)<0)return e;}return arr[arr.length-1];};
+
+/* ---------- game state ---------- */
+const G = { race:null, elements:[], destinies:[], dominant:null, aura:null, affinities:[] };
+
+/* ---------- asset load with graceful fallback (no broken boxes, §5) ---------- */
+function bgOrFallback(el,url,fallback){
+  const img=new Image();
+  img.onload=()=>{el.style.backgroundImage=`url('${url}')`;};
+  img.onerror=()=>{el.style.background=fallback;};
+  img.src=url;
+}
+
+/* ---------- screen router ---------- */
+const app=document.getElementById("app");
+const screens={};
+function screen(id){const s=document.createElement("div");s.className="screen";s.id=id;screens[id]=s;app.appendChild(s);return s;}
+function show(id){for(const k in screens)screens[k].classList.remove("active");screens[id].classList.add("active");
+  document.getElementById("restart").hidden=(id==="title");primary=screens[id].querySelector("[data-primary]");}
+let primary=null;
+document.getElementById("foot").textContent=STR.vsNote;
+
+/* ---------- TITLE ---------- */
+(function(){const s=screen("title");
+  const bg=document.createElement("div");bg.className="bg";s.appendChild(bg);
+  bgOrFallback(bg,"./assets/bg_dawn_mountains.png","radial-gradient(120% 100% at 50% 0%,#243b3f,#0c0a08)");
+  s.insertAdjacentHTML("beforeend",`<div class="stage">
+    <div class="kicker">${STR.subtitle}</div><h1>${STR.title}</h1>
+    <p class="lead">${STR.tagline}</p><div class="divider"></div>
+    <button class="btn" data-primary id="go">${STR.begin}</button></div>`);
+  s.querySelector("#go").onclick=()=>{buildRace();show("race");};
+})();
+
+/* ---------- RACE ---------- */
+function buildRace(){
+  if(screens.race)screens.race.remove(),delete screens.race;
+  const s=screen("race");
+  const bg=document.createElement("div");bg.className="bg";s.appendChild(bg);
+  bgOrFallback(bg,"./assets/bg_dawn_mountains.png","radial-gradient(120% 100% at 50% 0%,#243b3f,#0c0a08)");
+  s.insertAdjacentHTML("beforeend",`<div class="stage">
+    <div class="kicker">${STR.chooseRace}</div><p class="hint">${STR.raceHint}</p>
+    <div class="cards-row" id="races"></div>
+    <div class="racedesc" id="rdesc"></div>
+    <button class="btn" id="rcont" data-primary disabled>${STR.continue}</button></div>`);
+  const row=s.querySelector("#races");
+  RACES.forEach(r=>{
+    const c=document.createElement("div");c.className="race";c.tabIndex=0;
+    c.innerHTML=`<div class="portrait" data-img></div><div class="rname">${r.name}</div>
+      <div class="rtrait">${r.trait}</div>`;
+    bgOrFallback(c.querySelector("[data-img]"),r.img,"linear-gradient(160deg,#2a2018,#0f0c08)");
+    const choose=()=>{[...row.children].forEach(x=>x.classList.remove("sel"));c.classList.add("sel");
+      G.race=r;s.querySelector("#rdesc").textContent=r.blurb;s.querySelector("#rcont").disabled=false;};
+    c.onclick=choose;c.onkeydown=e=>{if(e.code==="Enter"||e.code==="Space"){choose();e.preventDefault();}};
+    row.appendChild(c);
+  });
+  s.querySelector("#rcont").onclick=()=>{drawCards();buildDraw();show("draw");};
+  show("race");
+}
+
+/* ---------- DRAW ---------- */
+function drawCards(){
+  // spirit_beast trait: gentle re-weight toward rare elements (kept minor & bounded)
+  const pool = G.race && G.race.id==="spirit_beast"
+    ? ELEMENTS.map(e=>({...e,weight:e.rarity==="common"?e.weight*0.8:e.weight*1.8})) : ELEMENTS;
+  G.elements=Array.from({length:9},()=>pickWeighted(pool));
+  // dominant element = most duplicated; Aura tier from that count, floored at a pair (bounded draw)
+  const counts={};G.elements.forEach(e=>counts[e.id]=(counts[e.id]||0)+1);
+  let domId=null,max=0;for(const e of G.elements){if(counts[e.id]>max){max=counts[e.id];domId=e.id;}}
+  G.dominant=ELEMENTS.find(e=>e.id===domId);
+  const auraCount=Math.min(9,Math.max(2,max));
+  G.aura=AURA_TIERS.find(t=>t.dup===auraCount)||AURA_TIERS[0];
+  G.affinities=Object.entries(counts).map(([id,n])=>({el:ELEMENTS.find(e=>e.id===id),n}))
+    .sort((a,b)=>b.n-a.n);
+  G.destinies=DESTINY_ASPECTS.map(a=>({aspect:a,grade:pickWeighted(DESTINY_GRADES)}));
+}
+function buildDraw(){
+  if(screens.draw)screens.draw.remove(),delete screens.draw;
+  const s=screen("draw");
+  s.insertAdjacentHTML("beforeend",`<div class="veil"></div><div class="stage">
+    <div class="kicker">${STR.drawTitle}</div><p class="hint">${STR.drawHint}</p>
+    <div class="lbl">${STR.elementCards}</div><div class="deck" id="deckE"></div>
+    <div class="lbl">${STR.destinyCards}</div><div class="deck destiny" id="deckD"></div>
+    <div style="display:flex;gap:12px;margin-top:1em;flex-wrap:wrap;justify-content:center">
+      <button class="btn ghost" id="reveal">${STR.revealAll}</button>
+      <button class="btn" id="toaura" data-primary disabled>${STR.toAura}</button></div></div>`);
+  let revealed=0;const total=15;
+  const mk=(deck,front,onFlip)=>{
+    const card=document.createElement("div");card.className="card pulse";card.tabIndex=0;
+    card.innerHTML=`<div class="face back" data-back></div><div class="face front">${front}</div>`;
+    bgOrFallback(card.querySelector("[data-back]"),"./assets/card_back.png","radial-gradient(circle,#2a2016,#0d0a07)");
+    const flip=()=>{if(card.classList.contains("flipped"))return;card.classList.add("flipped");
+      card.classList.remove("pulse");revealed++;onFlip&&onFlip();
+      if(revealed>=total)s.querySelector("#toaura").disabled=false;};
+    card.onclick=flip;card.onkeydown=e=>{if(e.code==="Enter"||e.code==="Space"){flip();e.preventDefault();}};
+    card._flip=flip;deck.appendChild(card);return card;
+  };
+  const dE=s.querySelector("#deckE"),dD=s.querySelector("#deckD");
+  G.elements.forEach(el=>mk(dE,`<div class="glyph" style="color:${el.color}">◈</div>
+    <div class="cname">${el.name}</div><div class="cgrade" style="color:${el.color}">${el.rarity}</div>`));
+  G.destinies.forEach(d=>mk(dD,`<div class="glyph" style="color:${d.grade.color}">${d.aspect.icon}</div>
+    <div class="cname">${d.aspect.name}</div><div class="cgrade" style="color:${d.grade.color}">${d.grade.name}</div>`));
+  s.querySelector("#reveal").onclick=()=>{[...dE.children,...dD.children].forEach((c,i)=>setTimeout(()=>c._flip(),i*70));};
+  s.querySelector("#toaura").onclick=()=>{buildAura();show("aura");};
+}
+
+/* ---------- AURA ---------- */
+function buildAura(){
+  if(screens.aura)screens.aura.remove(),delete screens.aura;
+  const s=screen("aura");const a=G.aura,el=G.dominant;
+  s.insertAdjacentHTML("beforeend",`<div class="veil"></div>
+   <div class="stage" style="--ac:${a.color}">
+    <div class="kicker">${STR.auraTitle}</div>
+    <div class="aura-wrap"><div class="aura-color"></div><div class="aura-tex" data-tex></div>
+      <div class="aura-core">${el.name}</div></div>
+    <div class="auraname">${a.name}</div>
+    <p class="hint" style="margin-top:.4em">${STR.auraElementLabel}: <b style="color:${el.color}">${el.name}</b> · ${a.ceilingNote}</p>
+    <div class="grants">
+      <div class="grant"><b>×${a.speed.toFixed(2)}</b><span>${STR.grantSpeed}</span></div>
+      <div class="grant"><b>${el.name}</b><span>${STR.auraElementLabel}</span></div></div>
+    <p class="lead"><b style="color:var(--amber)">${STR.auraPotential}</b> ${STR.auraExplain}</p>
+    <div class="divider"></div>
+    <button class="btn" data-primary id="tosum">${STR.toSummary}</button></div>`);
+  bgOrFallback(s.querySelector("[data-tex]"),"./assets/aura_glow.png","none");
+  s.querySelector("#tosum").onclick=()=>{buildSummary();show("summary");};
+}
+
+/* ---------- SUMMARY ---------- */
+function buildSummary(){
+  if(screens.summary)screens.summary.remove(),delete screens.summary;
+  const s=screen("summary");const a=G.aura;
+  const aff=G.affinities.map(x=>`<span class="aff ${x.el.id===G.dominant.id?'dom':''}">${x.el.name} ×${x.n}</span>`).join("");
+  const dst=G.destinies.map(d=>`<div class="dcell"><span class="di" style="color:${d.grade.color}">${d.aspect.icon}</span>
+    <div><div class="dk">${d.aspect.name}</div><div class="dv" style="color:${d.grade.color}">${d.grade.name}</div></div></div>`).join("");
+  s.insertAdjacentHTML("beforeend",`<div class="veil"></div><div class="stage">
+    <div class="kicker">${STR.summaryTitle}</div>
+    <div class="summary-grid">
+      <div class="sum-portrait" data-img></div>
+      <div>
+        <div class="sum-badge"><span class="dot" style="color:${a.color};background:${a.color}"></span>
+          <span>${G.race.name} · <span style="color:${a.color}">${a.name}</span></span></div>
+        <div style="color:var(--teal);font-size:13px;margin:-.3em 0 .6em">${G.race.trait}</div>
+        <div class="lbl" style="margin-top:0">${STR.affinities}</div><div class="aff-row">${aff}</div>
+        <div class="lbl">${STR.destinyTitle}</div><div class="destiny-row">${dst}</div>
+      </div></div>
+    <button class="btn" data-primary id="enter" style="margin-top:1.1em">${STR.enterWorld}</button>
+    <p class="hint" style="margin-top:.7em">${STR.permanentNote}</p></div>`);
+  bgOrFallback(s.querySelector("[data-img]"),G.race.img,"linear-gradient(160deg,#2a2018,#0f0c08)");
+  s.querySelector("#enter").onclick=()=>{buildWorld();show("world");};
+}
+
+/* ---------- WORLD / CULTIVATION (demonstrates Aura-scaled speed + effort) ---------- */
+function buildWorld(){
+  if(screens.world)screens.world.remove(),delete screens.world;
+  const s=screen("world");const a=G.aura;
+  const bg=document.createElement("div");bg.className="bg";s.appendChild(bg);
+  bgOrFallback(bg,"./assets/bg_world1.png","radial-gradient(120% 100% at 50% 20%,#2b4a3a,#0c0a08)");
+  s.insertAdjacentHTML("beforeend",`<div class="stage" style="--ac:${a.color}">
+    <div class="kicker">${STR.worldTitle}</div>
+    <p class="lead" style="margin-bottom:1em">${STR.worldIntro}</p>
+    <div class="world-panel">
+      <div class="realm-line"><span class="rl" id="realmName">${REALM.name}</span>
+        <span class="ly"><span id="layer">1</span> / ${REALM.layers} ${STR.ofRealm}</span></div>
+      <div class="bar"><i id="fill"></i></div>
+      <div class="stat-line"><span id="rate"></span><span id="pct">0%</span></div>
+      <div class="world-actions">
+        <button class="btn" id="qi" data-primary>${STR.meditate}</button>
+        <button class="btn ghost" id="autobtn">${STR.auto}</button></div>
+      <div class="note" id="note">${STR.speedNote}</div>
+    </div></div>`);
+  let layer=1,prog=0,auto=false,effortPulse=0;
+  const per=REALM.baseProgressPerLayer, autoRate=6*a.speed; // qi/sec passive, aura-scaled
+  const fill=s.querySelector("#fill"),layerEl=s.querySelector("#layer"),
+    pct=s.querySelector("#pct"),rate=s.querySelector("#rate"),note=s.querySelector("#note"),
+    realmName=s.querySelector("#realmName");
+  rate.textContent=`${autoRate.toFixed(1)} ${STR.qiPerSec} · ×${a.speed.toFixed(2)} aura`;
+  const addQi=(amt,effort)=>{
+    if(layer>REALM.layers)return;
+    prog+=amt;if(effort){effortPulse=1;note.textContent=STR.effortNote;}
+    while(prog>=per&&layer<=REALM.layers){prog-=per;layer++;
+      if(layer<=REALM.layers){layerEl.textContent=layer;
+        note.textContent=`${STR.breakthrough} ${REALM.name} — ${STR.layer} ${layer}`;
+        note.classList.remove("flash");void note.offsetWidth;note.classList.add("flash");}
+    }
+    if(layer>REALM.layers){note.textContent=STR.realmComplete;realmName.style.color=a.color;
+      fill.style.width="100%";pct.textContent="100%";s.querySelector("#qi").disabled=true;return;}
+    const p=Math.min(100,(prog/per)*100);fill.style.width=p+"%";pct.textContent=Math.floor(p)+"%";
+  };
+  const qiBtn=s.querySelector("#qi");
+  const tapEffort=()=>addQi(per*0.06,true);       // your own effort — on top of aura
+  qiBtn.onclick=tapEffort;
+  qiBtn.onkeydown=e=>{if(e.code==="Enter"||e.code==="Space"){tapEffort();e.preventDefault();}};
+  s.querySelector("#autobtn").onclick=(e)=>{auto=!auto;e.target.textContent=auto?"⏸ "+STR.auto:STR.auto;
+    if(!effortPulse)note.textContent=STR.speedNote;};
+  // fixed-timestep passive cultivation
+  let lastT=performance.now();
+  function loop(now){requestAnimationFrame(loop);
+    if(!screens.world.classList.contains("active"))return;
+    const dt=(now-lastT)/1000;lastT=now;
+    if(auto)addQi(autoRate*dt,false);
+    if(effortPulse>0){effortPulse-=dt*0.5;if(effortPulse<=0&&auto)note.textContent=STR.speedNote;}
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- restart + global keyboard ---------- */
+document.getElementById("restart").onclick=()=>{
+  rng=mulberry32((Math.random()*1e9)>>>0);
+  G.race=null;G.elements=[];G.destinies=[];G.dominant=null;G.aura=null;G.affinities=[];
+  show("title");
+};
+addEventListener("keydown",e=>{
+  if((e.code==="Enter")&&primary&&!primary.disabled){primary.click();e.preventDefault();}
+});
+show("title");
+</script>
+</body>
+</html>
