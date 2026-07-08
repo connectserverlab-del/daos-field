@@ -1,0 +1,5 @@
+id,role,type,description,size/ratio,style_line_ref,source
+grass_ground,terrain ground texture (tiled),texture,photoreal mossy grass valley floor seamless PBR albedo,1:1,cinematic-realism,generate
+cliff_rock,mountain/rock texture (tiled),texture,photoreal weathered mossy mountain stone seamless PBR albedo,1:1,cinematic-realism,generate
+sky_dawn,distant sky/cloud backdrop,background,photoreal cinematic dawn sky with god-rays and haze,16:9,cinematic-realism,generate
+ambient_score,ambient loop music,audio,serene guqin/dizi wuxia valley ambient loop,45s,cinematic-realism,generate

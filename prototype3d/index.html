@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>DAO'S FIELD — Human World I</title>
+<style>
+  :root{ --ivory:#efe6d2; --bronze:#c79a5b; --amber:#e8b84a; --ink:#07070a;
+    --serif:"Cormorant Garamond","Georgia","Songti SC","STSong","Times New Roman",serif; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--ink);color:var(--ivory);
+    font-family:var(--serif);overflow:hidden;overscroll-behavior:none;touch-action:none}
+  canvas{display:block;position:fixed;inset:0}
+  /* cinematic overlays */
+  #cine{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #cine .bar{position:absolute;left:0;right:0;height:8vh;background:#000;transition:height .8s ease}
+  #cine .bar.top{top:0} #cine .bar.bottom{bottom:0}
+  #cine .vig{position:absolute;inset:0;
+    background:radial-gradient(130% 110% at 50% 46%,transparent 52%,rgba(0,0,0,.42) 100%)}
+  #grain{position:fixed;inset:0;z-index:6;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
+  /* HUD */
+  #hud{position:fixed;inset:0;z-index:7;pointer-events:none;font-family:var(--serif)}
+  #loc{position:absolute;top:calc(8vh + 14px);left:50%;transform:translateX(-50%);
+    letter-spacing:.36em;text-transform:uppercase;font-size:13px;color:var(--ivory);opacity:0;
+    text-shadow:0 2px 14px #000;transition:opacity 1s}
+  #hint{position:absolute;bottom:calc(8vh + 12px);left:50%;transform:translateX(-50%);
+    font-size:13px;letter-spacing:.05em;color:#cfc7b4;opacity:.0;text-shadow:0 1px 8px #000;
+    transition:opacity 1s;text-align:center;padding:0 14px}
+  #prompt{position:absolute;bottom:calc(8vh + 46px);left:50%;transform:translateX(-50%);
+    font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);opacity:0;
+    text-shadow:0 0 16px rgba(232,184,74,.5),0 2px 8px #000;transition:opacity .4s;white-space:nowrap}
+  #dev{position:fixed;top:calc(8vh + 4px);left:6px;color:#6f6;font:12px monospace;z-index:9;display:none}
+  /* lore card */
+  #lore{position:absolute;left:50%;top:50%;transform:translate(-50%,-46%);width:min(560px,86vw);
+    text-align:center;opacity:0;transition:opacity .8s;pointer-events:none;z-index:8}
+  #lore .ln{letter-spacing:.4em;text-transform:uppercase;color:var(--bronze);font-size:13px;margin-bottom:.5em}
+  #lore .lt{font-size:clamp(24px,4.5vw,38px);letter-spacing:.1em;margin:.1em 0 .5em;
+    text-shadow:0 2px 20px #000}
+  #lore .lb{font-size:clamp(15px,2.6vw,19px);line-height:1.6;color:#e6dcc6;text-shadow:0 1px 10px #000}
+  /* touch controls */
+  .stick{position:fixed;bottom:calc(8vh + 26px);width:120px;height:120px;border-radius:50%;
+    border:1px solid rgba(239,230,210,.25);z-index:7;display:none;touch-action:none}
+  #stickL{left:22px} #stickL .nub{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+    border-radius:50%;background:rgba(239,230,210,.18);border:1px solid rgba(239,230,210,.4)}
+  .touch .stick{display:block}
+  /* buttons */
+  .ui-btn{position:fixed;z-index:8;pointer-events:auto;cursor:pointer;font-family:var(--serif);
+    background:linear-gradient(180deg,rgba(199,154,91,.2),rgba(199,154,91,.05));border:1px solid var(--bronze);
+    color:var(--ivory);letter-spacing:.1em;border-radius:2px;padding:.5em 1em;font-size:13px;backdrop-filter:blur(2px)}
+  #audioBtn{top:calc(8vh + 10px);right:12px}
+  /* title / loader */
+  #veil{position:fixed;inset:0;z-index:20;background:radial-gradient(120% 100% at 50% 30%,#1a2b30,#05060a);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    transition:opacity 1.2s ease;padding:24px}
+  #veil.gone{opacity:0;pointer-events:none}
+  #veil .kick{letter-spacing:.5em;text-transform:uppercase;color:var(--bronze);font-size:clamp(11px,2.4vw,14px)}
+  #veil h1{font-size:clamp(46px,11vw,104px);letter-spacing:.16em;margin:.06em 0 .1em;font-weight:600;
+    text-shadow:0 3px 30px rgba(0,0,0,.8),0 0 50px rgba(232,184,74,.14)}
+  #veil .sub{color:#cfc7b4;letter-spacing:.12em;font-size:clamp(15px,2.6vw,20px)}
+  #origins{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:1.4em 0 .3em}
+  .origin{cursor:pointer;padding:.5em 1em;border:1px solid rgba(199,154,91,.4);border-radius:2px;
+    letter-spacing:.1em;font-size:14px;color:#e6dcc6;transition:.25s;display:flex;align-items:center;gap:8px}
+  .origin .d{width:.7em;height:.7em;border-radius:50%;box-shadow:0 0 10px currentColor}
+  .origin:hover,.origin.sel{border-color:var(--amber);color:var(--ivory);box-shadow:0 0 20px rgba(232,184,74,.25)}
+  #enter{margin-top:1.2em;font-size:clamp(15px,2.6vw,18px);letter-spacing:.18em;text-transform:uppercase;
+    padding:.7em 1.9em;opacity:.5;pointer-events:none;transition:.3s}
+  #enter.ready{opacity:1;pointer-events:auto}
+  #load{margin-top:1.3em;color:#9c927e;letter-spacing:.2em;font-size:12px;text-transform:uppercase}
+  #foot{position:fixed;bottom:6px;left:0;right:0;z-index:20;text-align:center;color:#8a8172;
+    font-size:11px;letter-spacing:.08em;opacity:.6}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="loc"></div><div id="hint"></div><div id="prompt"></div>
+  <div id="lore"><div class="ln"></div><div class="lt"></div><div class="lb"></div></div>
+</div>
+<div id="cine"><div class="bar top"></div><div class="bar bottom"></div><div class="vig"></div></div>
+<div id="grain"></div>
+<div id="dev"></div>
+<div class="stick" id="stickL"><div class="nub"></div></div>
+<button class="ui-btn" id="audioBtn">♪ Music</button>
+
+<div id="veil">
+  <div class="kick" id="vkick"></div>
+  <h1 id="vtitle"></h1>
+  <div class="sub" id="vsub"></div>
+  <div class="kick" style="margin-top:1.4em;letter-spacing:.3em" id="vorigin"></div>
+  <div id="origins"></div>
+  <button class="ui-btn" id="enter"></button>
+  <div id="load"></div>
+</div>
+<div id="foot"></div>
+
+<script src="./vendor/three.min.js"></script>
+<script src="./vendor/shaders/CopyShader.js"></script>
+<script src="./vendor/shaders/LuminosityHighPassShader.js"></script>
+<script src="./vendor/shaders/FXAAShader.js"></script>
+<script src="./vendor/postprocessing/EffectComposer.js"></script>
+<script src="./vendor/postprocessing/RenderPass.js"></script>
+<script src="./vendor/postprocessing/ShaderPass.js"></script>
+<script src="./vendor/postprocessing/MaskPass.js"></script>
+<script src="./vendor/postprocessing/UnrealBloomPass.js"></script>
+<script src="./strings.js"></script>
+<script src="./game.js"></script>
+</body>
+</html>
