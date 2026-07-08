@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "_comment": "World layers = progression spine AND live-ops topology. Each layer carries downward-pull incentives (issue #4) so high-realm players have reasons to visit low worlds, and populationFloor for the merge system. Layers are added as data.",
+  "layers": [
+    {
+      "id": "human_world_1",
+      "order": 1,
+      "name": "Human World I",
+      "unlockRealm": "qi_gathering",
+      "recommendedRealms": ["qi_gathering", "foundation_establishment"],
+      "exclusiveResources": ["mortal_herbs", "iron_ore", "spirit_rice"],
+      "downwardPull": { "mentorBonus": true, "sectDutyNodes": true, "tribulationIngredient": "low_world_spirit_grass" },
+      "populationFloor": 500,
+      "mergeCandidate": true
+    },
+    {
+      "id": "human_world_2",
+      "order": 2,
+      "name": "Human World II",
+      "unlockRealm": "foundation_establishment",
+      "recommendedRealms": ["foundation_establishment", "golden_core"],
+      "exclusiveResources": ["spirit_steel", "azure_herbs"],
+      "downwardPull": { "mentorBonus": true, "sectDutyNodes": true },
+      "populationFloor": 500,
+      "mergeCandidate": true
+    },
+    {
+      "id": "human_world_9",
+      "order": 9,
+      "name": "Human World IX",
+      "unlockRealm": "soul_formation",
+      "recommendedRealms": ["soul_formation", "spirit_severing"],
+      "exclusiveResources": ["profound_jade", "nine_yang_flowers"],
+      "downwardPull": { "mentorBonus": true },
+      "populationFloor": 300,
+      "mergeCandidate": true,
+      "_note": "Human Worlds III–VIII omitted for brevity; generated from the same template as data."
+    },
+    {
+      "id": "spirit_world",
+      "order": 10,
+      "name": "Spirit World",
+      "unlockRealm": "spirit_severing",
+      "recommendedRealms": ["spirit_severing", "dao_seeking"],
+      "exclusiveResources": ["spirit_essence", "purple_flame_crystal"],
+      "downwardPull": { "mentorBonus": true },
+      "populationFloor": 300,
+      "mergeCandidate": true
+    },
+    {
+      "id": "immortal_world",
+      "order": 11,
+      "name": "Immortal World",
+      "unlockRealm": "immortal_ascension",
+      "recommendedRealms": ["immortal_ascension"],
+      "exclusiveResources": ["immortal_spirit_stone", "white_heavenly_flame_seed"],
+      "downwardPull": { "mentorBonus": true },
+      "populationFloor": 200,
+      "mergeCandidate": false
+    },
+    {
+      "id": "divine_world",
+      "order": 12,
+      "name": "Divine World",
+      "unlockRealm": "immortal_ascension",
+      "recommendedRealms": [],
+      "exclusiveResources": ["divine_ore"],
+      "downwardPull": {},
+      "populationFloor": 100,
+      "mergeCandidate": false,
+      "_note": "Endgame layer; realms/content added later as data."
+    },
+    {
+      "id": "origin_world",
+      "order": 13,
+      "name": "Origin World",
+      "unlockRealm": "immortal_ascension",
+      "recommendedRealms": [],
+      "exclusiveResources": ["origin_essence"],
+      "downwardPull": {},
+      "populationFloor": 50,
+      "mergeCandidate": false,
+      "_note": "Apex layer; reserved for far-future content."
+    }
+  ],
+  "_deathPolicy": "NO default open-world realm/world drop (design-review issue #1). Demotion exists only as an opt-in hardcore Tribulation Realm ruleset, never the open-world default."
+}

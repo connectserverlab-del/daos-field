@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "rarityTiers": ["common", "rare", "epic", "legendary", "mythic"],
+  "elements": [
+    {
+      "id": "earth",
+      "name": "Earth",
+      "rarity": "common",
+      "category": "defensive",
+      "description": "Stability, endurance, terrain control.",
+      "interactions": {
+        "water": { "relation": "countered_by", "damageMultiplier": 1.25 },
+        "wood": { "relation": "counters", "damageMultiplier": 1.25 }
+      },
+      "combinable": true,
+      "tags": ["constitution:stone_body", "dao:mountain"]
+    },
+    {
+      "id": "fire",
+      "name": "Fire",
+      "rarity": "common",
+      "category": "offensive",
+      "description": "Burst damage; core of alchemy and forging.",
+      "interactions": {
+        "water": { "relation": "countered_by", "damageMultiplier": 1.25 },
+        "gold": { "relation": "counters", "damageMultiplier": 1.25 },
+        "wood": { "relation": "synergy", "damageMultiplier": 1.1 }
+      },
+      "combinable": true,
+      "tags": ["constitution:phoenix_blood", "dao:destruction", "crafting:heavenly_fire"]
+    },
+    {
+      "id": "water",
+      "name": "Water",
+      "rarity": "common",
+      "category": "support",
+      "description": "Flow, adaptation, sustain.",
+      "interactions": {
+        "fire": { "relation": "counters", "damageMultiplier": 1.25 },
+        "earth": { "relation": "counters", "damageMultiplier": 1.25 }
+      },
+      "combinable": true,
+      "tags": ["dao:flow"]
+    },
+    {
+      "id": "wood",
+      "name": "Wood",
+      "rarity": "common",
+      "category": "support",
+      "description": "Growth, healing-over-time, life force.",
+      "interactions": {
+        "earth": { "relation": "countered_by", "damageMultiplier": 1.25 },
+        "gold": { "relation": "countered_by", "damageMultiplier": 1.25 }
+      },
+      "combinable": true,
+      "tags": ["dao:vitality", "profession:farmer"]
+    },
+    {
+      "id": "gold",
+      "name": "Gold",
+      "rarity": "common",
+      "category": "offensive",
+      "description": "Sharpness, penetration; core of weapon forging.",
+      "interactions": {
+        "wood": { "relation": "counters", "damageMultiplier": 1.25 },
+        "fire": { "relation": "countered_by", "damageMultiplier": 1.25 }
+      },
+      "combinable": true,
+      "tags": ["dao:sword", "crafting:forging"]
+    },
+    {
+      "id": "wind",
+      "name": "Wind",
+      "rarity": "rare",
+      "category": "utility",
+      "description": "Speed, mobility, evasion.",
+      "combinable": true,
+      "tags": ["dao:swiftness"]
+    },
+    {
+      "id": "lightning",
+      "name": "Lightning / Storm",
+      "rarity": "rare",
+      "category": "offensive",
+      "description": "High burst, tribulation affinity.",
+      "combinable": true,
+      "tags": ["dao:thunder", "tribulation:affinity"]
+    },
+    {
+      "id": "light",
+      "name": "Light",
+      "rarity": "epic",
+      "category": "support",
+      "description": "Healing and purification.",
+      "interactions": {
+        "dark": { "relation": "counters", "damageMultiplier": 1.3 }
+      },
+      "combinable": true,
+      "tags": ["profession:medic", "dao:radiance"]
+    },
+    {
+      "id": "dark",
+      "name": "Dark",
+      "rarity": "epic",
+      "category": "offensive",
+      "description": "Poison, corrosion, damage-over-time.",
+      "interactions": {
+        "light": { "relation": "countered_by", "damageMultiplier": 1.3 }
+      },
+      "combinable": true,
+      "tags": ["dao:poison"]
+    },
+    {
+      "id": "spirit",
+      "name": "Spirit",
+      "rarity": "legendary",
+      "category": "support",
+      "description": "Soul manipulation, taming, mental arts.",
+      "combinable": true,
+      "tags": ["dao:soul", "profession:beast_tamer"]
+    },
+    {
+      "id": "time",
+      "name": "Time",
+      "rarity": "legendary",
+      "category": "utility",
+      "description": "Acceleration, delay, rewind (bounded).",
+      "combinable": true,
+      "tags": ["dao:time", "law:minor"]
+    },
+    {
+      "id": "space",
+      "name": "Space",
+      "rarity": "legendary",
+      "category": "utility",
+      "description": "Teleportation, storage, domain warping.",
+      "combinable": true,
+      "tags": ["dao:space", "law:minor"]
+    },
+    {
+      "id": "life",
+      "name": "Life",
+      "rarity": "mythic",
+      "category": "law",
+      "description": "Creation and true healing; a governing law.",
+      "combinable": true,
+      "tags": ["law:major", "dao:life"]
+    },
+    {
+      "id": "fate",
+      "name": "Fate",
+      "rarity": "mythic",
+      "category": "law",
+      "description": "Luck, causality, destiny manipulation.",
+      "combinable": true,
+      "tags": ["law:major", "dao:fate"]
+    },
+    {
+      "id": "death",
+      "name": "Death",
+      "rarity": "mythic",
+      "category": "law",
+      "description": "Decay, ending, necromantic law.",
+      "combinable": true,
+      "tags": ["law:major", "dao:death"]
+    },
+    {
+      "id": "rule",
+      "name": "Rule",
+      "rarity": "mythic",
+      "category": "law",
+      "description": "Authority over laws themselves; the apex element.",
+      "combinable": true,
+      "tags": ["law:supreme", "dao:rule"]
+    }
+  ]
+}

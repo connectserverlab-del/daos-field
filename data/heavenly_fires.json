@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "_comment": "Nine Heavenly Fire grades mirror the aura ladder. Fires are a TAX/ENABLER, not a hard wall (design-review issue #3): a missing ideal fire raises cost/time and lowers success rather than blocking crafting outright. Substitution paths and rental keep a cartel from freezing top-tier crafting.",
+  "grades": [
+    { "id": "red_flame",    "order": 1, "auraTier": "red",    "maxRefineTier": 1, "rarity": "common",    "fuelType": "spirit_coal",       "rentable": true },
+    { "id": "orange_flame", "order": 2, "auraTier": "orange", "maxRefineTier": 2, "rarity": "common",    "fuelType": "spirit_coal",       "rentable": true },
+    { "id": "yellow_flame", "order": 3, "auraTier": "yellow", "maxRefineTier": 3, "rarity": "uncommon",  "fuelType": "flame_essence",     "rentable": true },
+    { "id": "green_flame",  "order": 4, "auraTier": "green",  "maxRefineTier": 4, "rarity": "uncommon",  "fuelType": "flame_essence",     "rentable": true },
+    { "id": "teal_flame",   "order": 5, "auraTier": "teal",   "maxRefineTier": 5, "rarity": "rare",      "fuelType": "profound_flame_oil","rentable": true },
+    { "id": "blue_flame",   "order": 6, "auraTier": "blue",   "maxRefineTier": 6, "rarity": "rare",      "fuelType": "profound_flame_oil","rentable": true },
+    { "id": "purple_flame", "order": 7, "auraTier": "purple", "maxRefineTier": 7, "rarity": "epic",      "fuelType": "heaven_flame_core", "rentable": true },
+    { "id": "pink_flame",   "order": 8, "auraTier": "pink",   "maxRefineTier": 8, "rarity": "legendary", "fuelType": "heaven_flame_core", "rentable": true },
+    { "id": "white_flame",  "order": 9, "auraTier": "white",  "maxRefineTier": 9, "rarity": "mythic",    "fuelType": "origin_flame_seed", "rentable": true }
+  ],
+  "substitutionPaths": [
+    { "id": "formation_assisted", "effect": "acts as +1 effective fire tier", "cost": "formation_master_labor + array_flags" },
+    { "id": "co_forging",         "effect": "pool multiple crafters' fires for +1 effective tier", "cost": "group_coordination" },
+    { "id": "false_flame",        "effect": "consumable substitute for missing fire, one refine", "cost": "expensive_consumable" }
+  ],
+  "gatingModel": {
+    "type": "tax_not_wall",
+    "missingIdealFire": {
+      "successRateMultiplier": 0.6,
+      "materialCostMultiplier": 1.8,
+      "timeMultiplier": 2.0
+    },
+    "_note": "Crafting a tier above your fire is possible but heavily taxed, never impossible — prevents the fire-holder monopoly (issue #3)."
+  },
+  "rentalModel": {
+    "escrow": true,
+    "timeBoxed": true,
+    "_note": "Fire-holders can list escrowed, time-boxed access on the market, turning a hoardable asset into a liquidity-providing service and spreading supply."
+  },
+  "sinks": {
+    "fuelUpkeep": true,
+    "containerDamageOnBotchedHighTier": true,
+    "_note": "Fires are consumable at the margin so supply is not strictly increasing forever."
+  }
+}
