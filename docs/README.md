@@ -24,6 +24,7 @@ cheap.
    - [`24`](systems/24-sects-academies-reputation.md) Academies, sects, reputation, recruitment
    - [`25`](systems/25-combat.md) Combat
    - [`26`](systems/26-monetization.md) Monetization (fair-by-design)
+   - [`27`](systems/27-appearance-customization.md) Appearance & character customization
 5. [`roadmap.md`](roadmap.md) — recommended build order across all systems.
 6. [`../data/`](../data) — the data-driven configuration itself (elements, auras, realms, worlds,
    fires) + JSON Schema. Proof that "add content without rewrites" is real.
