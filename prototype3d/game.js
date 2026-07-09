@@ -115,8 +115,8 @@ function grassTex(){
 /* ---------------- sky ---------------- */
 function makeSky(){
   var uni = {
-    top:{value:new THREE.Color(0x2f74b4)}, mid:{value:new THREE.Color(0xa2caea)},
-    bot:{value:new THREE.Color(0xdcecf4)}, sun:{value:SUN_DIR.clone()}
+    top:{value:new THREE.Color(0x2766a8)}, mid:{value:new THREE.Color(0x8fbbe0)},
+    bot:{value:new THREE.Color(0xc0d8ec)}, sun:{value:SUN_DIR.clone()}
   };
   var mat = new THREE.ShaderMaterial({
     side:THREE.BackSide, depthWrite:false, uniforms:uni,
@@ -137,8 +137,18 @@ function makeSky(){
   if (tex.sky){
     tex.sky.wrapS = THREE.RepeatWrapping; tex.sky.encoding = THREE.sRGBEncoding;
     var band = new THREE.Mesh(new THREE.CylinderGeometry(1500, 1500, 820, 64, 1, true),
-      new THREE.MeshBasicMaterial({ map:tex.sky, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.97 }));
-    band.position.y = 120; scene.add(band);
+      new THREE.MeshBasicMaterial({ map:tex.sky, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.5 }));
+    band.position.y = 150; scene.add(band);
+  }
+  // layered misty-mountain backdrop (C-drama atmospheric depth) sitting on the horizon
+  if (tex.mist){
+    tex.mist.wrapS = THREE.RepeatWrapping; tex.mist.encoding = THREE.sRGBEncoding;
+    var mb = new THREE.Mesh(new THREE.CylinderGeometry(1300, 1300, 360, 96, 1, true),
+      new THREE.MeshBasicMaterial({ map:tex.mist, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.9 }));
+    mb.position.y = 55; scene.add(mb);
+    var mb2 = new THREE.Mesh(new THREE.CylinderGeometry(900, 900, 260, 96, 1, true),
+      new THREE.MeshBasicMaterial({ map:tex.mist, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.55 }));
+    mb2.rotation.y = 1.7; mb2.position.y = 30; scene.add(mb2);
   }
   // sun sprite (bloom picks it up as god-ray source)
   var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:radialTex("rgba(255,244,214,1)","rgba(255,220,150,0)"),
@@ -169,9 +179,10 @@ function makeTerrain(){
     sh.fragmentShader = "uniform sampler2D tDirt; uniform sampler2D tRock; varying float vWy; varying vec2 vWXZ; varying float vUp;\n" +
       sh.fragmentShader.replace("#include <map_fragment>",
         "#ifdef USE_MAP\n" +
-        " vec3 gcol = texture2D( map, vUv ).rgb;\n" +
-        " vec3 dcol = texture2D( tDirt, vUv ).rgb;\n" +
-        " vec3 rcol = texture2D( tRock, vUv*0.55 ).rgb;\n" +
+        // sample each texture at two scales and blend by macro noise → kills obvious tiling
+        " vec3 gcol = mix(texture2D( map, vUv ).rgb, texture2D( map, vUv*0.237+0.19 ).rgb, 0.5);\n" +
+        " vec3 dcol = mix(texture2D( tDirt, vUv ).rgb, texture2D( tDirt, vUv*0.31+0.4 ).rgb, 0.5);\n" +
+        " vec3 rcol = mix(texture2D( tRock, vUv*0.55 ).rgb, texture2D( tRock, vUv*0.17 ).rgb, 0.5);\n" +
         " float m = sin(vWXZ.x*0.03)*0.5 + sin(vWXZ.y*0.025+1.7)*0.5; m = m*0.5+0.5;\n" +
         " float steep = 1.0 - smoothstep(0.60, 0.82, vUp);\n" +
         " float high  = smoothstep(24.0, 46.0, vWy);\n" +
@@ -228,8 +239,8 @@ function makeMountains(){
 function clumpGeo(){
   var geos=[], q;
   for (var i=0;i<3;i++){
-    q = new THREE.PlaneGeometry(1.5, 0.8);           // shorter, wider tufts → carpet, not spikes
-    q.translate(0, 0.4, 0);
+    q = new THREE.PlaneGeometry(1.35, 1.7, 1, 3);    // taller tufts; segmented so wind bends smoothly
+    q.translate(0, 0.85, 0);
     q.rotateY(i*Math.PI/3);
     geos.push(q);
   }
@@ -250,39 +261,73 @@ function clumpGeo(){
   merged.computeVertexNormals();
   return merged;
 }
+var grassWinds=[];
+function grassMaterial(){
+  var m = new THREE.MeshStandardMaterial({ map:(tex.blade||grassTex()), alphaTest:0.30, transparent:false,
+    side:THREE.DoubleSide, color:0xffffff, roughness:1, metalness:0 });
+  if(m.map){ m.map.encoding=THREE.sRGBEncoding; m.map.anisotropy=4; }
+  m.onBeforeCompile = function(sh){
+    sh.uniforms.t = { value:0 }; if(!grassMat._wind) grassMat._wind=sh.uniforms.t; grassWinds.push(sh.uniforms.t);
+    sh.vertexShader = "uniform float t;\nvarying float vBladeH;\n" + sh.vertexShader.replace("#include <begin_vertex>",
+      "#include <begin_vertex>\n vBladeH = uv.y;\n float ph = instanceMatrix[3][0]*0.32 + instanceMatrix[3][2]*0.32;\n float gust = sin(t*1.5 + ph) + 0.4*sin(t*3.1 + ph*1.7);\n float bend = position.y*position.y*0.11;\n transformed.x += gust * bend;\n transformed.z += cos(t*1.15 + ph*0.8) * bend * 0.55;");
+    // darker at the root, brighter tips → lush volumetric read
+    sh.fragmentShader = "varying float vBladeH;\n" + sh.fragmentShader.replace("#include <map_fragment>",
+      "#include <map_fragment>\n diffuseColor.rgb *= mix(vec3(0.5,0.56,0.42), vec3(1.18,1.22,1.02), clamp(vBladeH,0.0,1.0));");
+  };
+  return m;
+}
 function makeGrass(){
   var blade = clumpGeo();
-  var gmat = new THREE.MeshStandardMaterial({ map:grassTex(), alphaTest:0.42, transparent:false,
-    side:THREE.DoubleSide, color:0xffffff, roughness:1, metalness:0 });
-  gmat.onBeforeCompile = function(sh){
-    sh.uniforms.t = { value:0 }; grassMat._wind = sh.uniforms.t;
-    // wind sway grows toward the blade tip (position.y); vary per clump by world pos
-    sh.vertexShader = "uniform float t;\n" + sh.vertexShader.replace("#include <begin_vertex>",
-      "#include <begin_vertex>\n float ph = instanceMatrix[3][0]*0.35 + instanceMatrix[3][2]*0.35;\n float gust = sin(t*1.5 + ph) + 0.35*sin(t*3.1 + ph*1.7);\n transformed.x += gust * position.y * 0.22;\n transformed.z += cos(t*1.15 + ph*0.8) * position.y * 0.12;");
-  };
+  var gmat = grassMaterial();
   var AREA = PLAY;                     // spread across the whole roamable valley
-  var N = 46000, inst = new THREE.InstancedMesh(blade, gmat, N);
+  var N = 150000, inst = new THREE.InstancedMesh(blade, gmat, N);
   var d = new THREE.Object3D(), col=new THREE.Color(), n=0;
   for (var i=0;i<N;i++){
     var x=(hash2(i,21)-0.5)*2*AREA, z=(hash2(i,57)-0.5)*2*AREA;
     var y=heightAt(x,z);
     if (y<WATER_Y+0.4 || y>66) continue;                 // no grass in water or high rock
-    if (Math.abs(x) < 15 + hash2(i,11)*8) continue;      // keep the riverbank clearish
-    if (onPath(x,z) > 0.55) continue;                    // don't grow through the trodden path
-    var r=Math.sqrt(x*x+z*z); var dens = r<AREA*0.62 ? 1 : hash2(i,44); if(dens<0.42) continue;
-    d.position.set(x,y-0.05,z); d.rotation.y=hash2(i,3)*TAU;
-    var s=0.7+hash2(i,8)*0.62; d.scale.set(s,s*(0.8+hash2(i,2)*0.5),s); d.updateMatrix();
+    if (Math.abs(x) < 14 + hash2(i,11)*8) continue;      // keep the riverbank clearish
+    if (onPath(x,z) > 0.5) continue;                     // don't grow through the trodden path
+    var r=Math.sqrt(x*x+z*z); var dens = r<AREA*0.72 ? 1 : hash2(i,44); if(dens<0.3) continue;
+    d.position.set(x,y-0.06,z); d.rotation.y=hash2(i,3)*TAU;
+    var s=0.75+hash2(i,8)*0.7; d.scale.set(s,s*(1.0+hash2(i,2)*0.55),s); d.updateMatrix();
     inst.setMatrixAt(n, d.matrix);
-    // per-clump tint: muted greens, drier toward higher ground
-    var dry=smoothstep(24,52,y);
-    var h=0.235 - dry*0.05 + (hash2(i,5)-0.5)*0.04;
-    var l=0.26 + hash2(i,6)*0.1 - dry*0.05;
-    col.setHSL(h, 0.44-dry*0.12, l); inst.setColorAt(n, col);
+    var dry=smoothstep(26,54,y);
+    var h=0.26 - dry*0.06 + (hash2(i,5)-0.5)*0.04;
+    var l=0.36 + hash2(i,6)*0.12 - dry*0.06;
+    col.setHSL(h, 0.52-dry*0.14, l); inst.setColorAt(n, col);
     n++;
   }
   inst.count = n; inst.instanceColor.needsUpdate=true;
-  inst.castShadow=false; inst.receiveShadow=true; scene.add(inst);
+  inst.castShadow=false; inst.receiveShadow=true; inst.frustumCulled=false; scene.add(inst);
   grassMat._grassInst = inst;
+  makeGrassNear(blade);
+}
+/* dense near-field grass that follows the player — the lush cinematic foreground */
+var grassNear=null, GN=9000, GN_R=42, gnOffs=null;
+function makeGrassNear(blade){
+  grassNear=new THREE.InstancedMesh(blade, grassMaterial(), GN);
+  grassNear.frustumCulled=false; grassNear.receiveShadow=true;
+  gnOffs=new Float32Array(GN*2);
+  var col=new THREE.Color(), d=new THREE.Object3D();
+  for(var i=0;i<GN;i++){
+    var a=hash2(i,3)*TAU, rr=Math.sqrt(hash2(i,7))*GN_R;
+    gnOffs[i*2]=Math.cos(a)*rr; gnOffs[i*2+1]=Math.sin(a)*rr;
+    col.setHSL(0.26+(hash2(i,5)-0.5)*0.04, 0.5, 0.36+hash2(i,6)*0.12); grassNear.setColorAt(i,col);
+    d.updateMatrix(); grassNear.setMatrixAt(i,d.matrix);
+  }
+  grassNear.instanceColor.needsUpdate=true; scene.add(grassNear);
+}
+function updateGrassNear(){
+  if(!grassNear) return;
+  var bx=Math.round(player.pos.x/1.5)*1.5, bz=Math.round(player.pos.z/1.5)*1.5, d=new THREE.Object3D();
+  for(var i=0;i<GN;i++){
+    var x=bx+gnOffs[i*2], z=bz+gnOffs[i*2+1], y=heightAt(x,z);
+    if((y<WATER_Y+0.4)||(y>66)||(Math.abs(x)<14)||(onPath(x,z)>0.5)){ d.position.set(x,-9999,z); d.scale.setScalar(0.0001); }
+    else { var s=0.72+hash2(i,8)*0.55; d.position.set(x,y-0.06,z); d.rotation.set(0,hash2(i,4)*TAU,0); d.scale.set(s,s*1.15,s); }
+    d.updateMatrix(); grassNear.setMatrixAt(i,d.matrix);
+  }
+  grassNear.instanceMatrix.needsUpdate=true;
 }
 
 /* ---------------- paths ----------------
@@ -374,7 +419,7 @@ function coniferGeo(){
   return mergeGeos(cones);
 }
 function broadleafGeo(){
-  var blobs=[]; var pts=[[0,1.02,0,0.5],[0.28,0.9,0.1,0.36],[-0.26,0.92,-0.12,0.34],[0.05,1.16,-0.05,0.33]];
+  var blobs=[]; var pts=[[0,0.86,0,0.62],[0.34,0.68,0.14,0.48],[-0.32,0.72,-0.16,0.46],[0.08,1.04,-0.06,0.44],[0,0.56,0,0.54]];
   pts.forEach(function(p){ var s=new THREE.IcosahedronGeometry(p[3],1); s.translate(p[0],p[1],p[2]); blobs.push(s); });
   return mergeGeos(blobs);
 }
@@ -656,6 +701,45 @@ function makeBridge(){
   g.position.set(0,0,6); scene.add(g);
 }
 
+/* ---------------- foliage billboards (hydrangea, ferns) ---------------- */
+function billboardClump(w,h){
+  var geos=[]; for(var i=0;i<2;i++){ var q=new THREE.PlaneGeometry(w,h,1,2); q.translate(0,h*0.5,0); q.rotateY(i*Math.PI/2); geos.push(q); }
+  return mergeGeos(geos);
+}
+function placeFoliage(texture, height, places){
+  if(!texture || !places.length) return;
+  texture.encoding=THREE.sRGBEncoding;
+  var geo=billboardClump(height*0.95, height);
+  var mat=new THREE.MeshStandardMaterial({map:texture, alphaTest:0.42, side:THREE.DoubleSide, roughness:1, metalness:0, color:0xffffff});
+  windify(mat, 0.05);
+  var inst=new THREE.InstancedMesh(geo, mat, places.length); inst.frustumCulled=false; inst.receiveShadow=true;
+  var d=new THREE.Object3D();
+  for(var i=0;i<places.length;i++){ var p=places[i]; d.position.set(p.x,p.y,p.z); d.rotation.set(0,p.rot,0); d.scale.setScalar(p.s); d.updateMatrix(); inst.setMatrixAt(i,d.matrix); }
+  scene.add(inst);
+}
+function makeFoliage(){
+  // hydrangea clusters hugging the water banks, the village and the paths
+  var flowers=[];
+  for(var i=0;i<420;i++){
+    var side=hash2(i,2)<0.5?-1:1, x=side*(15+hash2(i,3)*13), z=-95+hash2(i,4)*205, y=heightAt(x,z);
+    if(y<WATER_Y+0.1 || y>9 || onPath(x,z)>0.5) continue;
+    flowers.push({x:x,y:y-0.1,z:z,rot:hash2(i,5)*TAU,s:0.7+hash2(i,6)*0.7});
+  }
+  for(var v=0;v<70;v++){ var a=(v/70)*TAU, rr=VILLAGE.r*(0.6+hash2(v,9)*0.35);
+    var fx=VILLAGE.x+Math.cos(a)*rr, fz=VILLAGE.z+Math.sin(a)*rr, fy=heightAt(fx,fz);
+    if(onPath(fx,fz)>0.5) continue; flowers.push({x:fx,y:fy,z:fz,rot:hash2(v,3)*TAU,s:0.7+hash2(v,7)*0.6}); }
+  placeFoliage(tex.flower, 3.0, flowers);
+  // ferns dotted loosely across the meadow and forest edges (sparse — no hedge walls)
+  var ferns=[];
+  for(var f=0;f<420;f++){
+    if(hash2(f,12)>0.42) continue;                        // sparse scatter
+    var x2=(hash2(f,71)-0.5)*2*PLAY, z2=(hash2(f,33)-0.5)*2*PLAY, y2=heightAt(x2,z2);
+    if(y2<WATER_Y+1 || y2>70 || onPath(x2,z2)>0.4 || Math.hypot(x2-VILLAGE.x,z2-VILLAGE.z)<VILLAGE.r) continue;
+    ferns.push({x:x2,y:y2-0.1,z:z2,rot:hash2(f,9)*TAU,s:0.6+hash2(f,4)*0.55});
+  }
+  placeFoliage(tex.fern, 2.4, ferns);
+}
+
 /* ---------------- particles: spirit motes + petals + mist ---------------- */
 var motes, petals, mistPlanes=[], trees=[];
 function makeParticles(){
@@ -788,14 +872,32 @@ function makeLights(){
 }
 
 /* ---------------- post ---------------- */
+/* cinematic C-drama colour grade: soft teal shadows, warm highlights, bloom-friendly */
+var GRADE_SHADER = {
+  uniforms:{ tDiffuse:{value:null} },
+  vertexShader:"varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+  fragmentShader:
+    "uniform sampler2D tDiffuse; varying vec2 vUv;"+
+    "void main(){ vec3 c=texture2D(tDiffuse,vUv).rgb;"+
+    "  c=(c-0.5)*1.04+0.5;"+                                   // gentle contrast
+    "  float l=dot(c,vec3(0.299,0.587,0.114));"+
+    "  vec3 shadowT=vec3(0.88,0.99,1.03), highT=vec3(1.03,1.0,0.96);"+  // teal shadows / warm highs
+    "  c*=mix(shadowT, highT, smoothstep(0.15,0.85,l));"+
+    "  c=mix(vec3(l), c, 1.08);"+                              // saturation lift
+    "  vec2 d=vUv-0.5; float vig=smoothstep(0.92,0.32,length(d));"+
+    "  c*=mix(0.8,1.0,vig);"+                                  // vignette
+    "  gl_FragColor=vec4(clamp(c,0.0,1.0),1.0); }"
+};
 function makePost(){
   composer=new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene,camera));
-  bloom=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight), 0.5, 0.4, 0.9);
+  bloom=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight), 0.34, 0.42, 0.9);
   composer.addPass(bloom);
   fxaa=new THREE.ShaderPass(THREE.FXAAShader);
   fxaa.material.uniforms["resolution"].value.set(1/innerWidth,1/innerHeight);
-  fxaa.renderToScreen=true; composer.addPass(fxaa);
+  composer.addPass(fxaa);
+  var grade=new THREE.ShaderPass(GRADE_SHADER);
+  grade.renderToScreen=true; composer.addPass(grade);
 }
 
 /* ---------------- input ---------------- */
@@ -910,8 +1012,9 @@ function update(dt, t){
   sun.position.copy(SUN_DIR.clone().multiplyScalar(120)).add(player.pos); sun.target.position.copy(player.pos);
   // water + grass + particles animation
   if(waterMat)waterMat.uniforms.t.value=t;
-  if(grassMat&&grassMat._wind)grassMat._wind.value=t;
+  for(var gw=0;gw<grassWinds.length;gw++) grassWinds[gw].value=t;
   for(var wi=0;wi<windU.length;wi++) windU[wi].value=t;
+  updateGrassNear();
   updateModels(dt,t);
   updateVfx(dt,t);
   animParticles(dt,t);
@@ -958,7 +1061,9 @@ function deriveNormal(img, strength){
 function loadTextures(cb){
   var loader=new THREE.TextureLoader();
   var items=[["grass","./assets/grass_ground.webp"],["rock","./assets/cliff_rock.webp"],
-             ["dirt","./assets/dirt_ground.webp"],["sky","./assets/sky_dawn.webp"]];
+             ["dirt","./assets/dirt_ground.webp"],["sky","./assets/sky_dawn.webp"],
+             ["blade","./assets/grass_blade.png"],["flower","./assets/flower_hydrangea.png"],
+             ["fern","./assets/fern_bush.png"],["mist","./assets/mist_mountains.webp"]];
   var remaining=items.length;
   function done(){
     try{
@@ -976,10 +1081,10 @@ function loadTextures(cb){
 
 /* ---------------- world build + boot ---------------- */
 function buildWorld(){
-  scene=new THREE.Scene(); scene.background=new THREE.Color(0xbcdcee); scene.fog=new THREE.FogExp2(0xbcdcee,0.0021);
+  scene=new THREE.Scene(); scene.background=new THREE.Color(0xafcadf); scene.fog=new THREE.FogExp2(0xafcadf,0.0016);
   camera=new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 3000);
   makeLights(); makeSky(); makeTerrain(); makeWater(); makeMountains();
-  makePath(); makeGrass(); scatter(); makeVillage(); makeLotus(); makeBridge(); makeParticles(); makePOIs(); makePlayer();
+  makePath(); makeGrass(); scatter(); makeVillage(); makeLotus(); makeBridge(); makeFoliage(); makeParticles(); makePOIs(); makePlayer();
   loadModels();
   makePost();
   camera.position.set(0, heightAt(0,20)+6, 22);
@@ -1003,7 +1108,7 @@ function toggleAudio(){ if(!audio)return; if(audioOn){audio.pause();audioOn=fals
 function fade(a,to,ms){ var s=a.volume,st=performance.now(); (function step(n){ var k=Math.min(1,(n-st)/ms); a.volume=s+(to-s)*k; if(k<1)requestAnimationFrame(step); })(st); }
 
 /* ================= developer panel + element attunement + hand VFX ================= */
-var DEV={speedMul:1, fly:false, day:0.82}, grantedSet={}, attunedId=null,
+var DEV={speedMul:1, fly:false, day:0.58}, grantedSet={}, attunedId=null,
     grantOrbs=[], handGlow=null, vfxProj=[], flyH=0, _tmpCol=new THREE.Color(), _spark=null;
 function sparkTex(){ if(!_spark)_spark=radialTex("rgba(255,255,255,1)","rgba(255,255,255,0)"); return _spark; }
 function elById(id){ for(var i=0;i<ELEMENTS.length;i++) if(ELEMENTS[i].id===id) return ELEMENTS[i]; return null; }
@@ -1072,10 +1177,10 @@ function revokeElement(id){ delete grantedSet[id]; if(attunedId===id)attunedId=n
 function setAttuned(id){ attunedId=id; refreshHUD(); }
 function teleport(x,z){ player.pos.set(x,heightAt(x,z),z); player.vel.set(0,0,0); flyH=0; }
 function setDaylight(v){
-  if(sun) sun.intensity=0.5+v*1.9;
-  if(hemiLight) hemiLight.intensity=0.35+v*0.65;
-  if(ambLight) ambLight.intensity=0.18+v*0.24;
-  if(renderer) renderer.toneMappingExposure=0.88+v*0.5;
+  if(sun) sun.intensity=0.5+v*1.5;
+  if(hemiLight) hemiLight.intensity=0.35+v*0.5;
+  if(ambLight) ambLight.intensity=0.18+v*0.22;
+  if(renderer) renderer.toneMappingExposure=0.8+v*0.4;   // keep highlights from blowing out
 }
 function toggleDev(){ var p=$("devPanel"); if(p) p.classList.toggle("open"); }
 function buildDevPanel(){

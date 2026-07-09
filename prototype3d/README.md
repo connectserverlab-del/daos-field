@@ -17,8 +17,13 @@ ambient guqin score.
   spiralling trailers and a forward bolt.
 - Wide valley heightfield (2 km plane) with a flattened village plateau, rolling
   hills, a carved river + lotus pond, and a stone arch bridge.
-- Realistic ground cover: crossed-plane **grass clumps** (not stray sticks),
-  terrain-tinted and wind-swayed; a winding dirt **pathway** network.
+- **Photoreal ground** — Higgsfield-generated meadow / dirt / granite textures with
+  multi-scale anti-tiling; dense tall **grass** (real blade cards) with a near-field
+  layer that follows the player for a lush cinematic foreground; a dirt **pathway** network.
+- **Foliage** — blue hydrangea clusters and ferns (transparent cutouts) along the
+  banks, village and forest edges.
+- **C-drama atmosphere** — soft hazy sky, a layered misty-mountain backdrop panorama,
+  cool volumetric fog and a cinematic colour-grade post pass (teal shadows / warm highs).
 - Unique **forest biomes** — pine, autumn broadleaf, birch, bamboo and sakura —
   as instanced trees, plus scattered rocks.
 - Bright midday sky, atmospheric fog, distant snow-capped mountains, animated
