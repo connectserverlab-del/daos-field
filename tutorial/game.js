@@ -5,6 +5,7 @@
    gather → fight spirit beast → alchemist pill → cultivate → first technique.
    Data-driven (./data/*.json, ./gamedata/*.json). Saves to localStorage. */
 import { createCultivationEngine, makeRng } from "./sim/index.js";
+import { QiEngine } from "./qi.js";
 
 const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
@@ -22,9 +23,12 @@ const WATER_Y=-1.3;
 function riverZ(x){ return -30 + Math.sin(x*0.02)*8; }
 function heightAt(x,z){
   let n = fbm(x*0.012+5, z*0.012+2)*5.5 + fbm(x*0.045,z*0.045)*1.4;
-  n += Math.pow(Math.max(0,(Math.abs(x)-120))/30,2)*10;
+  // mountain walls on all four sides bound a larger playable bowl (~330×330 inside the 400 plane)
+  n += Math.pow(Math.max(0,(Math.abs(x)-165))/34,2)*12;
+  n += Math.pow(Math.max(0,(Math.abs(z)-165))/34,2)*12;
   n -= Math.exp(-Math.pow(z-riverZ(x),2)/(2*9*9))*3.8;         // river channel
-  const md=Math.hypot(x+95,z+95); n += Math.max(0,(55-md))*0.5; // mountain corner
+  const md=Math.hypot(x+95,z+95); n += Math.max(0,(55-md))*0.5; // NW mountain
+  const md2=Math.hypot(x-140,z-120); n += Math.max(0,(46-md2))*0.42; // SE ridge (far forest backdrop)
   return n;
 }
 
@@ -62,10 +66,10 @@ function makeLights(){
 }
 let waterMat;
 function makeTerrain(){
-  const geo=new THREE.PlaneGeometry(300,300,220,220); geo.rotateX(-Math.PI/2);
+  const geo=new THREE.PlaneGeometry(400,400,260,260); geo.rotateX(-Math.PI/2);
   const pos=geo.attributes.position; for(let i=0;i<pos.count;i++) pos.setY(i,heightAt(pos.getX(i),pos.getZ(i)));
   geo.computeVertexNormals();
-  if(tex.grass){tex.grass.wrapS=tex.grass.wrapT=THREE.RepeatWrapping;tex.grass.repeat.set(40,40);}
+  if(tex.grass){tex.grass.wrapS=tex.grass.wrapT=THREE.RepeatWrapping;tex.grass.repeat.set(54,54);}
   if(tex.dirt){tex.dirt.wrapS=tex.dirt.wrapT=THREE.RepeatWrapping;}
   const m=new THREE.MeshStandardMaterial({map:tex.grass||null,color:0xdfe6d2,roughness:1,metalness:0});
   m.onBeforeCompile=(sh)=>{ sh.uniforms.tDirt={value:tex.dirt||tex.grass};
@@ -77,7 +81,7 @@ function makeTerrain(){
   waterMat=new THREE.ShaderMaterial({transparent:true,uniforms:{t:{value:0}},
     vertexShader:"varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
     fragmentShader:"varying vec3 vP;uniform float t;void main(){float r=sin(vP.x*0.4+t)*0.5+cos(vP.y*0.5-t*1.2)*0.5;float f=smoothstep(-1.0,1.0,r);vec3 c=mix(vec3(0.09,0.2,0.23),vec3(0.7,0.82,0.86),0.3+f*0.4);c+=vec3(1.0,0.95,0.8)*pow(max(f,0.0),6.0)*0.35;gl_FragColor=vec4(c,0.85);}"});
-  const w=new THREE.Mesh(new THREE.PlaneGeometry(300,300,1,1),waterMat); w.rotation.x=-Math.PI/2; w.position.y=WATER_Y; scene.add(w);
+  const w=new THREE.Mesh(new THREE.PlaneGeometry(400,400,1,1),waterMat); w.rotation.x=-Math.PI/2; w.position.y=WATER_Y; scene.add(w);
 }
 
 /* ---------- GLB props ---------- */
@@ -115,7 +119,7 @@ const G = {
   questIndex:0, inventory:{}, techniques:[], flags:{},
   paused:false, ready:false, inDialogue:false, inAwaken:false, meditating:false,
 };
-let QUESTS, NPCS_D, ITEMS, TECHS;
+let QUESTS, NPCS_D, ITEMS, TECHS, qiData, qiEngine;
 
 /* ---------- player ---------- */
 const player = { pos:new THREE.Vector3(0,0,20), yaw:Math.PI, sprite:null, speed:0, vel:new THREE.Vector3(), attacking:false, at:0, hurtFlash:0 };
@@ -137,7 +141,7 @@ function addInteractable(o){ o.pos=o.pos.clone?o.pos:new THREE.Vector3(o.pos[0],
 let nearest=null;
 
 /* ---------- world content ---------- */
-let daoTree, meditationStone, herbNodes=[], beast=null;
+let daoTree, meditationStone, herbNodes=[], beast=null, beasts=[];
 function buildWorld2(){
   // Dao Tree — the reused tree.glb, scaled monumental, central
   daoTree = place("tree", 0, -8, 42, 0.3);
@@ -158,11 +162,36 @@ function buildWorld2(){
   place("bridge",0,riverZ(0),4.5,Math.PI/2,WATER_Y+0.2+0.3);
   // Mountain + cave (NW) — landmark + future content
   place("mountain",-95,-95,44,0.4); place("mountain",-120,-72,28,1.3);
-  place("cave",-86,-64,8,0.2);
-  // Forest (north, across the river): trees
-  let t=0; for(let i=0;i<90&&t<34;i++){ const x=(hash2(i,11)-0.5)*220, z=-50-hash2(i,29)*80;
-    if(Math.abs(z-riverZ(x))<10) continue; if(heightAt(x,z)<WATER_Y+0.5) continue;
-    place("tree",x,z,8+hash2(i,3)*5,hash2(i,7)*TAU); t++; }
+  place("mountain",150,140,40,0.7); place("mountain",128,168,26,2.1); // SE massif
+  place("cave",-86,-64,8,0.2); place("cave",150,120,8,1.6);            // second cave (SE)
+  // Forests — several clusters spread across the enlarged map so the world feels lived-in.
+  // Each cluster: a centre, a radius, a count, and a size range. Data-driven so more can be added.
+  const FORESTS=[
+    {cx:-10,cz:-92,r:80,n:52,h:[8,14]},   // north woods (across the river — the tutorial forest)
+    {cx:120,cz:60,r:60,n:40,h:[9,15]},    // eastern deep forest
+    {cx:-120,cz:70,r:55,n:34,h:[7,12]},   // western thicket
+    {cx:70,cz:150,r:55,n:30,h:[10,16]},   // SE old-growth (under the massif)
+    {cx:-60,cz:150,r:45,n:22,h:[6,10]},   // south copse
+  ];
+  let seedi=0;
+  for(const F of FORESTS){
+    let placed=0;
+    for(let i=0;i<F.n*3 && placed<F.n;i++){ seedi++;
+      const a=hash2(seedi,11)*TAU, rr=Math.sqrt(hash2(seedi,29))*F.r;
+      const x=F.cx+Math.cos(a)*rr, z=F.cz+Math.sin(a)*rr;
+      if(Math.abs(x)>184||Math.abs(z)>184) continue;
+      if(Math.abs(z-riverZ(x))<10) continue;                 // keep the river clear
+      if(heightAt(x,z)<WATER_Y+0.5) continue;                // no trees in water
+      if(Math.hypot(x,z-(-8))<20) continue;                  // clearing around the Dao Tree
+      place("tree",x,z,F.h[0]+hash2(seedi,3)*(F.h[1]-F.h[0]),hash2(seedi,7)*TAU); placed++;
+    }
+  }
+  // standing stones / rock clusters as landmarks in the clearings
+  for(let i=0;i<10;i++){ const x=(hash2(i+80,5)-0.5)*320, z=(hash2(i+80,9)-0.5)*320;
+    if(Math.abs(x)>180||Math.abs(z)>180||heightAt(x,z)<WATER_Y+1||Math.hypot(x,z-(-8))<24) continue;
+    const rk=new THREE.Mesh(new THREE.DodecahedronGeometry(1+hash2(i+80,3)*2,0),new THREE.MeshStandardMaterial({map:tex.rock||null,color:0x8a857a,roughness:1,flatShading:true}));
+    rk.position.set(x,heightAt(x,z)+0.6,z); rk.rotation.set(hash2(i,1)*TAU,hash2(i,2)*TAU,hash2(i,4)*TAU); rk.castShadow=true; rk.receiveShadow=true; scene.add(rk);
+  }
   // Meditation Stone — near the Dao Tree
   meditationStone=new THREE.Mesh(new THREE.DodecahedronGeometry(1.6,0),new THREE.MeshStandardMaterial({map:tex.rock||null,color:0x8f8a80,roughness:1,flatShading:true}));
   meditationStone.position.set(22,heightAt(22,-4)+1.0,-4); meditationStone.castShadow=true; scene.add(meditationStone);
@@ -177,8 +206,17 @@ function buildWorld2(){
       onInteract:()=>gatherHerb(node) });
     herbNodes.push(node);
   }
-  // Spirit beast (forest)
-  spawnBeast();
+  // Spirit beasts — the tutorial beast (blocks Q5) plus a roaming pack spread across the forests.
+  // Data-driven list; tier scales hp/damage/reward so the world stays fightable, not just one duel.
+  beast = spawnBeast({ x:20, z:-78, hp:60, dmg:7, tutorial:true, name:"Corrupted Spirit Beast" });
+  const PACK=[
+    { x:-30,z:-108, hp:48, dmg:6 }, { x:40,z:-120, hp:70, dmg:9 },
+    { x:118,z:52,  hp:80, dmg:10 }, { x:140,z:80,  hp:64, dmg:8 },
+    { x:-118,z:64, hp:56, dmg:7 }, { x:-132,z:88,  hp:74, dmg:9 },
+    { x:74,z:150,  hp:96, dmg:12 }, { x:56,z:132,  hp:82, dmg:10 },
+    { x:-58,z:150, hp:52, dmg:7 },
+  ];
+  for(const b of PACK) spawnBeast(b);
   // NPCs from data
   for(const npc of NPCS_D.npcs) makeNPC(npc);
 }
@@ -200,14 +238,22 @@ function makeNPC(npc){
     onInteract:()=>talkTo(npc) });
 }
 
-/* ---------- spirit beast (reused combat pattern) ---------- */
-function spawnBeast(){
-  const fr=heroFrames.beast; if(!fr||!fr.length) return;
-  const bb=billboard(fr[0],6.2); const x=20,z=-78,y=heightAt(x,z);
+/* ---------- spirit beasts (multi; reused combat pattern) ---------- */
+function spawnBeast(cfg){
+  const fr=heroFrames.beast; if(!fr||!fr.length) return null;
+  const x=cfg.x, z=cfg.z, y=heightAt(x,z);
+  const scale=6.2*(0.85+(cfg.hp||60)/120*0.5);
+  const bb=billboard(fr[0],scale);
   const grp=new THREE.Group(); grp.add(bb.mesh); grp.position.set(x,y,z); scene.add(grp);
   const blob=new THREE.Mesh(new THREE.PlaneGeometry(3.5,3.5),new THREE.MeshBasicMaterial({map:radialTex("rgba(0,0,0,0.5)","rgba(0,0,0,0)"),transparent:true,depthWrite:false}));
   blob.rotation.x=-Math.PI/2; blob.position.y=0.05; grp.add(blob);
-  beast={ grp, bb, frames:fr, pos:new THREE.Vector3(x,y,z), hp:60, hpMax:60, state:"idle", hurt:0, dead:false, atkCd:0 };
+  const b={ grp, bb, frames:fr, home:new THREE.Vector3(x,y,z), pos:new THREE.Vector3(x,y,z),
+    hp:cfg.hp||60, hpMax:cfg.hp||60, dmg:cfg.dmg||7, state:"idle", hurt:0, dead:false, atkCd:0,
+    tutorial:!!cfg.tutorial, name:cfg.name||"Spirit Beast", status:null };
+  // enemy handle consumed by the QiEngine (stable object; engine writes `status` onto it)
+  b.handle={ get pos(){return b.pos;}, get alive(){return !b.dead;}, status:null,
+    damage:(d,opt)=>hitBeast(b,d,opt&&opt.dot), knock:(dir,f)=>{ if(b.dead)return; b.pos.addScaledVector(dir,Math.min(f,7)*0.5); b.pos.x=clamp(b.pos.x,-184,184); b.pos.z=clamp(b.pos.z,-184,184); } };
+  beasts.push(b); return b;
 }
 
 /* ---------- boot ---------- */
@@ -215,19 +261,19 @@ async function boot(){
   makeRenderer();
   if(("ontouchstart" in window)||navigator.maxTouchPoints>0) document.body.classList.add("touch");
   $("foot").textContent="Tutorial region · reuses Phase-2 world + Phase-4 combat + tested cultivation sim";
-  $("hint").textContent=document.body.classList.contains("touch")?"Left stick move · ✦ interact/attack":"WASD move · Shift run · E interact · click/Space attack · Q technique · I bag";
+  $("hint").textContent=document.body.classList.contains("touch")?"Left stick move · ✦ interact/attack":"WASD move · Shift run · E interact · click/Space attack · Q + 1–5 Qi techniques · 6 Limitless · I bag";
   const tips=["Aura is potential, not power. A Red-aura cultivator can still surpass a White-aura genius.","The Dao Tree chooses once. Your cards are permanent.","Effort adds qi on top of your Aura's pace — the ceiling belongs to the diligent."];
   $("#veil"); $("veil").querySelector(".tip").textContent=tips[Math.floor(Math.random()*tips.length)];
   if(new URLSearchParams(location.search).has("dev")){ $("dev").style.display="block"; window._dev=true; }
 
   // load data + engine
   const bar=$("loadbar").firstElementChild; const setP=(p)=>bar.style.width=Math.round(p)+"%";
-  const [elements,auras,realms,races,destiny,draw,quests,npcs,items] = await Promise.all([
+  const [elements,auras,realms,races,destiny,draw,quests,npcs,items,qi] = await Promise.all([
     loadJSON("./gamedata/elements.json"),loadJSON("./gamedata/auras.json"),loadJSON("./gamedata/cultivation_realms.json"),
     loadJSON("./gamedata/races.json"),loadJSON("./gamedata/destiny.json"),loadJSON("./gamedata/draw.json"),
-    loadJSON("./data/quests.json"),loadJSON("./data/npcs.json"),loadJSON("./data/items.json") ]);
+    loadJSON("./data/quests.json"),loadJSON("./data/npcs.json"),loadJSON("./data/items.json"),loadJSON("./data/qi.json") ]);
   engine=createCultivationEngine({elements,auras,realms,races,destiny,draw});
-  QUESTS=quests.quests; NPCS_D=npcs; ITEMS=items.items; TECHS=items.techniques;
+  QUESTS=quests.quests; NPCS_D=npcs; ITEMS=items.items; TECHS=items.techniques; qiData=qi;
   data={elements,auras,realms}; setP(25);
 
   scene=new THREE.Scene(); scene.background=new THREE.Color(0xc4d3d6); scene.fog=new THREE.FogExp2(0xc4d3d6,0.0045);
@@ -243,6 +289,7 @@ async function boot(){
   ]); setP(85);
 
   makeSky(); makeTerrain(); buildWorld2(); makePlayer(); setP(95);
+  initQiEngine();
   bindInput(); initAudio();
   loadSave();                 // restores cards/aura/quest/inventory or leaves fresh
   refreshHUD();
@@ -255,7 +302,15 @@ async function boot(){
   window.__tp=(x,z)=>{ player.pos.set(x,heightAt(x,z),z); };
   window.__interact=()=>interact();
   window.__attack=()=>heroAttack();
-  window.__tech=()=>castTechnique();
+  window.__tech=()=>castTechnique(0);
+  window.__qi=(slot)=>castTechnique(slot|0);
+  window.__qiState=()=>({ el:G.qiElement, rank:qiRank(), qi:Math.round(G.qi), parts:qiEngine?qiEngine.parts.length:0, proj:qiEngine?qiEngine.projectiles.length:0, decals:qiEngine?qiEngine.decals.length:0, mesh:qiEngine?qiEngine.meshFx.length:0, statuses:qiEngine?qiEngine.statuses.length:0, guard:!!G.guard });
+  window.__beasts=()=>beasts.map(b=>({dead:b.dead,hp:Math.round(b.hp),st:b.handle.status?b.handle.status.id:null,tut:!!b.tutorial}));
+  // dev harness hooks (used by the headless Qi regression; harmless in prod)
+  window.__qidev={ unlock:()=>unlockTechnique(), setQi:(v)=>{G.qi=G.qiMax=v;}, setEl:(e)=>{G.qiElement=e;},
+    setRank:(r)=>{ if(G.cultivator)G.cultivator.realmIndex=r; }, face:(y)=>{player.yaw=y;},
+    beastPos:()=>beast?[+beast.pos.x.toFixed(1),+beast.pos.z.toFixed(1),Math.round(beast.hp)]:null,
+    weaken:()=>{ for(const b of beasts) if(b.tutorial) b.hp=Math.min(b.hp,6); }, guard:()=>!!G.guard };
   window.__state=()=>({q:G.questIndex, quest:currentQuest()&&currentQuest().id, awakened:!!G.flags.awakened, aura:G.aura&&G.aura.tierId, dom:G.dominant, inv:{...G.inventory}, tech:[...G.techniques], hp:Math.round(G.hp), realm:G.cultivator?G.cultivator.realmIndex:-1, layer:G.cultivator?G.cultivator.layer:0, beastDead:!!(beast&&beast.dead), near:nearest?nearest.id:null, dlg:G.inDialogue, med:G.meditating});
   window.__beastPos=()=>beast?[+beast.pos.x.toFixed(1),+beast.pos.z.toFixed(1),beast.hp]:null;
   window.__step=(n=1)=>{ for(let i=0;i<n;i++) update(0.1, performance.now()/1000); };
@@ -263,9 +318,14 @@ async function boot(){
   log("boot complete. awakened=",!!G.flags.awakened,"quest=",G.questIndex);
 }
 
+const vfxTex={};
 function loadTextures(){ return new Promise(res=>{ const l=new THREE.TextureLoader();
-  const items=[["grass","./assets/grass_ground.webp"],["dirt","./assets/dirt_ground.webp"],["rock","./assets/cliff_rock.webp"],["sky","./assets/sky_dawn.webp"]]; let n=items.length;
-  items.forEach(it=>l.load(it[1],tx=>{tx.encoding=THREE.sRGBEncoding;tex[it[0]]=tx;if(--n===0)res();},undefined,()=>{if(--n===0)res();})); }); }
+  const items=[["grass","./assets/grass_ground.webp"],["dirt","./assets/dirt_ground.webp"],["rock","./assets/cliff_rock.webp"],["sky","./assets/sky_dawn.webp"]];
+  // Qi VFX textures (Higgsfield-generated, keyed): particle sprites + ground decals
+  const vfx=[["smoke","./assets/vfx_smoke.webp"],["dust","./assets/vfx_dust.webp"],["splash","./assets/vfx_splash.webp"],["leaf","./assets/vfx_leaf.webp"],["scorch","./assets/decal_scorch.webp"],["crack","./assets/decal_crack.webp"],["hollow","./assets/vfx_hollow.webp"]];
+  let n=items.length+vfx.length;
+  items.forEach(it=>l.load(it[1],tx=>{tx.encoding=THREE.sRGBEncoding;tex[it[0]]=tx;if(--n===0)res();},undefined,()=>{if(--n===0)res();}));
+  vfx.forEach(it=>l.load(it[1],tx=>{tx.encoding=THREE.sRGBEncoding;tx.minFilter=THREE.LinearFilter;vfxTex[it[0]]=tx;if(--n===0)res();},undefined,()=>{if(--n===0)res();})); }); }
 async function loadHeroSprites(){
   const [run,atk,idle,beast]=await Promise.all([loadImg("./assets/hero_run.webp"),loadImg("./assets/hero_attack.webp"),loadImg("./assets/hero_idle.webp"),loadImg("./assets/enemy_demon_beast.webp")]);
   if(run)heroFrames.run=keySlice(run,6); if(atk)heroFrames.attack=keySlice(atk,5); if(idle)heroFrames.idle=keySlice(idle,1); if(beast)heroFrames.beast=keySlice(beast,4);
@@ -335,12 +395,21 @@ function gatherHerb(node){ if(!node.enabled) return; node.enabled=false; if(node
   advanceQuest("gather","spirit_herb"); save(); }
 
 /* ---------- combat ---------- */
-function damageBeast(dmg){ if(!beast||beast.dead)return; beast.hp-=dmg; beast.hurt=0.4; hitstop=0.06; shake=0.5; sfx("hit");
-  spawnDamage(beast.pos, dmg);
-  if(beast.hp<=0){ beast.dead=true; beast.state="dead"; G.flags.beastKilled=true;
-    setTimeout(()=>{ if(beast.grp) beast.grp.visible=false; }, 1200);
-    banner("Victory","The Corrupted Spirit Beast falls."); advanceQuest("kill","spirit_beast"); save(); } }
-function hurtPlayer(dmg){ if(G.hp<=0)return; G.hp=Math.max(0,G.hp-dmg); player.hurtFlash=0.4; shake=0.6; refreshHUD();
+function hitBeast(b,dmg,dot){ if(!b||b.dead)return; b.hp-=dmg; b.hurt=0.4;
+  if(!dot){ hitstop=Math.max(hitstop,0.05); shake=Math.max(shake,0.4); sfx("hit"); spawnDamage(b.pos, dmg); }
+  if(b.hp<=0) killBeast(b); }
+function killBeast(b){ if(b.dead)return; b.dead=true; b.state="dead"; b.status=null; b.handle.status=null;
+  setTimeout(()=>{ if(b.grp) b.grp.visible=false; }, 1200);
+  if(b.tutorial){ G.flags.beastKilled=true; banner("Victory","The "+b.name+" falls."); advanceQuest("kill","spirit_beast"); save(); }
+  else { banner("Beast Slain", b.name+" is scattered to qi."); } }
+// back-compat: melee path calls damageBeast against the nearest live beast in range
+function damageBeast(dmg){ const b=nearestBeast(player.pos,6.5); if(b) hitBeast(b,dmg,false); }
+function nearestBeast(p,maxD){ let best=null,bd=maxD==null?1e9:maxD; for(const b of beasts){ if(b.dead)continue; const d=Math.hypot(p.x-b.pos.x,p.z-b.pos.z); if(d<bd){bd=d;best=b;} } return best; }
+function hurtPlayer(dmg,source){ if(G.hp<=0)return;
+  if(G.guard&&G.guard.time>0){ dmg*=(1-(G.guard.reduce||0));
+    if(G.guard.retaliate && source && !source.dead){ hitBeast(source,G.guard.retaliate,false);
+      if(G.guard.retaliateStatus){ const def=qiData.statusEffects[G.guard.retaliateStatus]; if(def){ source.status={id:G.guard.retaliateStatus,def,remaining:def.duration,tick:0}; source.handle.status=source.status; if(qiEngine&&!qiEngine.statuses.includes(source.handle))qiEngine.statuses.push(source.handle);} } } }
+  G.hp=Math.max(0,G.hp-dmg); player.hurtFlash=0.4; shake=Math.max(shake,0.6); refreshHUD();
   if(G.hp<=0) playerDown(); }
 function playerDown(){ banner("Defeated","Your qi scatters — you awaken back in the village. (No cards lost.)");
   setTimeout(()=>{ G.hp=G.hpMax; player.pos.set(10,0,44); refreshHUD(); }, 1400); }
@@ -369,27 +438,58 @@ function tickMeditation(dt){    // driven by update() — deterministic, no setI
   }
   refreshHUD();
 }
-function unlockTechnique(){
-  const el=G.dominant;
-  let tdef=TECHS.find(t=>t.element===el) || TECHS.find(t=>t.default);
-  if(!tdef) return;
-  if(!G.techniques.includes(tdef.id)) G.techniques.push(tdef.id);
-  G.activeTech=tdef; $("tech").style.opacity="1"; $("tech").innerHTML="<b>Q</b> — "+tdef.name;
-  banner("Technique Unlocked", tdef.name); save();
+/* The player's dominant element drives a full 5-technique Qi kit (data in ./data/qi.json).
+   Q / 1 = Basic · 2 = Charged · 3 = Area · 4 = Guard · 5 = Dash.
+   Breakthroughs raise the upgrade rank (0→2), so cultivation deepens every technique. */
+const QI_SLOTS=["basic","charged","area","defense","utility"];
+function qiElementOf(){ let el=G.dominant; if(!qiData||!el||!qiData.elements[el]) el="gold"; return el; } // light/dark fall back to gold until authored
+function qiRank(){ return clamp(G.cultivator?G.cultivator.realmIndex:0,0,2); }
+function initQiEngine(){
+  qiEngine=new QiEngine({ THREE, scene, camera, data:qiData, textures:vfxTex,
+    hooks:{
+      heightAt,
+      sfx:(k)=>sfx(k),
+      damageNumber:(p,v)=>spawnDamage(p,v),
+      shake:(v)=>{ shake=Math.max(shake,v); },
+      player:{ get pos(){ return player.pos; } },
+      enemies:()=>beasts.filter(b=>!b.dead).map(b=>b.handle),
+      dash:(dir,dist,time)=>{ player.dashDir=dir.clone().setY(0).normalize(); player.dashSpeed=dist/Math.max(0.05,time); player.dashT=time; },
+      applyBuff:(buff,element,tech)=>{ G.guard={ reduce:buff.damageReduce||0, retaliate:buff.retaliate||0, retaliateStatus:buff.retaliateStatus, regen:buff.regen||0, moveBoost:buff.moveBoost||1, time:buff.duration||5 }; }
+    }});
 }
-function castTechnique(){
-  if(!G.activeTech){ return; }
-  if(G.qi<15){ banner("Not enough Qi","Meditate to restore qi."); return; }
-  G.qi-=15; refreshHUD();
-  const col=new THREE.Color(G.activeTech.color||"#e8b84a");
-  // VFX: a burst of colored particles + light in front of the player
+function unlockTechnique(){
+  const el=qiElementOf(); G.qiElement=el;
+  const basic=el+"_basic"; if(!G.techniques.includes(basic)) G.techniques.push(basic);
+  G.activeTech=qiData.techniques[basic];
+  showTechHUD();
+  banner("Technique Awakened", qiData.elements[el].name+" Qi — "+G.activeTech.name); save();
+}
+// Limitless (JJK inheritance): press 6 after awakening to open the Six Eyes — Blue / Red / Hollow Purple.
+// Purely a data-driven element swap; the same engine renders it recoloured. Toggle back to your Dao element.
+function toggleLimitless(){
+  if(!G.flags||!G.flags.awakened||!qiData||!qiData.elements.limitless) return;
+  if(G.qiElement==="limitless"){ G.qiElement=qiElementOf(); banner("Cursed Technique Sealed","Returned to "+qiData.elements[G.qiElement].name+" Qi"); }
+  else { G.qiElement="limitless"; banner("Limitless · 無下限","The Six Eyes open — 1 Blue · 2 Red · 3 Hollow Purple · 4 Infinity · 5 Blue Step"); }
+  showTechHUD();
+}
+function showTechHUD(){ if(!G.qiElement||!qiData)return; const el=qiData.elements[G.qiElement];
+  const t=(k)=>qiData.techniques[G.qiElement+"_"+k].name;
+  $("tech").style.opacity="1";
+  $("tech").innerHTML="<b>"+el.name+" Qi</b> · <b>Q</b>/1 "+t("basic")+" &nbsp;·&nbsp; 2 "+t("charged")+" &nbsp;·&nbsp; 3 "+t("area")+" &nbsp;·&nbsp; 4 "+t("defense")+" &nbsp;·&nbsp; 5 "+t("utility");
+}
+function castTechnique(slot){
+  slot=slot|0;
+  if(!G.qiElement){ if(G.dominant) G.qiElement=qiElementOf(); else return; }
+  if(!qiEngine||!qiData) return;
+  const techId=G.qiElement+"_"+(QI_SLOTS[slot]||"basic");
+  const def=qiData.techniques[techId]; if(!def) return;
+  if(!qiEngine.canCast(techId)){ return; }                 // on cooldown
+  if(G.qi<def.qiCost){ banner("Not enough Qi","Meditate to restore qi."); return; }
   const dir=new THREE.Vector3(Math.sin(player.yaw),0,Math.cos(player.yaw));
-  const origin=player.pos.clone().add(dir.clone().multiplyScalar(2.5)).setY(player.pos.y+2);
-  spawnBurst(origin, col);
-  const light=new THREE.PointLight(col.getHex(),6,14); light.position.copy(origin); scene.add(light);
-  let life=0.5; const iv=setInterval(()=>{ life-=0.05; light.intensity=Math.max(0,life*12); if(life<=0){clearInterval(iv);scene.remove(light);} },50);
-  sfx("cast");
-  if(QUESTS[G.questIndex] && QUESTS[G.questIndex].trigger.type==="technique") advanceQuest("technique","any");
+  const origin=player.pos.clone().add(dir.clone().multiplyScalar(1.7)).setY(player.pos.y+2.3);
+  const res=qiEngine.cast(techId, qiRank(), origin, dir);
+  if(res&&res.ok){ G.qi-=def.qiCost; refreshHUD();
+    if(QUESTS[G.questIndex] && QUESTS[G.questIndex].trigger.type==="technique") advanceQuest("technique","any"); }
 }
 const bursts=[];
 function spawnBurst(origin,col){ const N=80,g=new THREE.BufferGeometry(),a=new Float32Array(N*3),v=[];
@@ -462,7 +562,7 @@ function loadSave(){ let s=null; try{ s=JSON.parse(localStorage.getItem(SAVE_KEY
     G.aura=G.cultivator.aura; G.dominant=G.aura.dominantElement;
     G.hpMax=Math.min(500,80+Math.round(G.cultivator.stats.vitality)); G.hp=G.hpMax; G.qiMax=Math.min(500,80+Math.round(G.cultivator.stats.qi)); G.qi=G.qiMax;
   }
-  if(G.techniques.length){ const t=TECHS.find(x=>x.id===G.techniques[0]); if(t){ G.activeTech=t; $("tech").style.opacity="1"; $("tech").innerHTML="<b>Q</b> — "+t.name; } }
+  if(G.flags.awakened && G.dominant){ G.qiElement=qiElementOf(); if(G.techniques.length){ G.activeTech=qiData.techniques[G.qiElement+"_basic"]; showTechHUD(); } }
   if(s.pos){ player.pos.set(s.pos[0],0,s.pos[1]); }
   refreshInv(); log("save loaded: quest",G.questIndex,"awakened",G.flags.awakened);
 }
@@ -477,7 +577,9 @@ function bindInput(){
   addEventListener("keydown",e=>{ if(BIND[e.code]){keys[BIND[e.code]]=1;} if(e.code==="ShiftLeft"||e.code==="ShiftRight")keys.run=1;
     if(e.code==="KeyE"){ interact(); }
     if(e.code==="Space"||e.code==="Enter"){ if(G.inDialogue){nextLine();} else if(G.inAwaken){closeAwakening();} else heroAttack(); e.preventDefault(); }
-    if(e.code==="KeyQ") castTechnique();
+    if(e.code==="KeyQ") castTechnique(0);
+    if(e.code>="Digit1" && e.code<="Digit5"){ castTechnique(+e.code.slice(5)-1); }
+    if(e.code==="Digit6") toggleLimitless();
     if(e.code==="KeyI"){ const p=$("inv"); p.classList.toggle("on"); }
   });
   addEventListener("keyup",e=>{ if(BIND[e.code])keys[BIND[e.code]]=0; if(e.code==="ShiftLeft"||e.code==="ShiftRight")keys.run=0; });
@@ -522,23 +624,35 @@ function tick(now){ requestAnimationFrame(tick); _frames++; if(G.paused)return;
   if(window._dev){ $("dev").textContent=Math.round(1/Math.max(0.001,(now-(tick._l||now))/1000))+" fps"; tick._l=now; }
 }
 function update(dt,t){
+  if(qiEngine) qiEngine.update(dt);              // advance all Qi VFX / projectiles / status ticks
   if(G.meditating){ tickMeditation(dt); }
+  // guard buff (defensive techniques): decay, regen, expire
+  if(G.guard&&G.guard.time>0){ G.guard.time-=dt; if(G.guard.regen&&G.hp<G.hpMax){ G.hp=Math.min(G.hpMax,G.hp+G.guard.regen*dt); refreshHUD(); } if(G.guard.time<=0)G.guard=null; }
   const frozen = G.inDialogue||G.inAwaken||G.meditating;
+  let moving=false;
+  // dash (movement techniques) overrides normal locomotion for its brief window
+  if(player.dashT>0 && !frozen){ player.dashT-=dt; player.pos.addScaledVector(player.dashDir,player.dashSpeed*dt);
+    player.yaw=Math.atan2(player.dashDir.x,player.dashDir.z); player.speed=player.dashSpeed; moving=true;
+    player.pos.x=clamp(player.pos.x,-184,184); player.pos.z=clamp(player.pos.z,-184,184); player.pos.y=heightAt(player.pos.x,player.pos.z);
+    player.group.position.set(player.pos.x,player.pos.y,player.pos.z);
+  } else {
   // movement
   let mx=0,mz=0; if(!frozen){ if(keys.f)mz-=1;if(keys.b)mz+=1;if(keys.l)mx-=1;if(keys.r)mx+=1; if(touchMove.active){mx+=touchMove.x;mz+=touchMove.y;} }
-  const len=Math.hypot(mx,mz); const moving=len>0.08 && !player.attacking;
+  const len=Math.hypot(mx,mz); moving=len>0.08 && !player.attacking;
+  const boost=(G.guard&&G.guard.moveBoost)?G.guard.moveBoost:1;
   if(moving){ mx/=len;mz/=len; const cos=Math.cos(camYaw),sin=Math.sin(camYaw); const wx=mx*cos-mz*sin,wz=-mx*sin-mz*cos;
-    const sp=(keys.run?15:8); player.vel.lerp(new THREE.Vector3(wx,0,wz).multiplyScalar(sp),1-Math.pow(0.001,dt)); player.yaw=Math.atan2(wx,wz);
+    const sp=(keys.run?15:8)*boost; player.vel.lerp(new THREE.Vector3(wx,0,wz).multiplyScalar(sp),1-Math.pow(0.001,dt)); player.yaw=Math.atan2(wx,wz);
   } else player.vel.lerp(new THREE.Vector3(),1-Math.pow(0.0001,dt));
   player.speed=player.vel.length();
   player.pos.addScaledVector(player.vel,dt);
-  player.pos.x=clamp(player.pos.x,-146,146); player.pos.z=clamp(player.pos.z,-146,146);
+  player.pos.x=clamp(player.pos.x,-184,184); player.pos.z=clamp(player.pos.z,-184,184);
   player.pos.y=heightAt(player.pos.x,player.pos.z);
+  }
   player.group.position.set(player.pos.x,player.pos.y+Math.sin(t*11)*0.05*Math.min(1,player.speed*0.15),player.pos.z);
   player.ring.material.opacity=(G.aura?0.16:0.08)+Math.sin(t*2)*0.06;
   // hero anim
   if(player.attacking){ player.at+=dt; const idx=Math.floor(player.at/0.08); if(idx>=heroFrames.attack.length){player.attacking=false;player.at=0;} else player.sprite.set(heroFrames.attack[idx]);
-    if(Math.floor((player.at-dt)/0.08)!==idx && idx===2 && beast && !beast.dead){ if(player.pos.distanceTo(beast.pos)<6) damageBeast(18+Math.round((G.cultivator?G.cultivator.stats.attack:20)*0.1)); }
+    if(Math.floor((player.at-dt)/0.08)!==idx && idx===2){ damageBeast(18+Math.round((G.cultivator?G.cultivator.stats.attack:20)*0.1)); }
   } else if(moving && heroFrames.run.length){ player._ap=(player._ap||0)+dt*(2.4+player.speed*0.2); player.sprite.set(heroFrames.run[Math.floor(player._ap)%heroFrames.run.length]); }
   else player.sprite.set(heroFrames.idle[0]||heroFrames.run[0]);
   player.sprite.mesh.rotation.y=Math.atan2(camera.position.x-player.pos.x,camera.position.z-player.pos.z);
@@ -557,15 +671,19 @@ function update(dt,t){
   for(let i=bursts.length-1;i>=0;i--){ const b=bursts[i]; b.life-=dt*1.6; const a=b.p.geometry.attributes.position.array;
     for(let j=0;j<b.v.length;j++){ a[j*3]+=b.v[j].x*dt;a[j*3+1]+=b.v[j].y*dt-dt*2;a[j*3+2]+=b.v[j].z*dt; } b.p.geometry.attributes.position.needsUpdate=true; b.p.material.opacity=Math.max(0,b.life);
     if(b.life<=0){ scene.remove(b.p); bursts.splice(i,1); } }
-  // beast AI
-  if(beast && !beast.dead){ const bb=beast.bb; beast.bb.mesh.rotation.y=Math.atan2(camera.position.x-beast.pos.x,camera.position.z-beast.pos.z);
-    const d=player.pos.distanceTo(beast.pos);
-    if(beast.hurt>0){ beast.hurt-=dt; bb.set(beast.frames[2]||beast.frames[0]); }
-    else if(d<22 && d>3.4){ const dir=player.pos.clone().sub(beast.pos).setY(0).normalize(); beast.pos.addScaledVector(dir,4*dt); bb.set(beast.frames[1]||beast.frames[0]); }
-    else bb.set(beast.frames[0]);
-    beast.pos.y=heightAt(beast.pos.x,beast.pos.z); beast.grp.position.copy(beast.pos);
-    beast.atkCd-=dt; if(d<3.6 && beast.atkCd<=0){ beast.atkCd=1.6; hurtPlayer(7); }
-  } else if(beast&&beast.dead){ beast.bb.set(beast.frames[3]||beast.frames[0]); beast.grp.position.copy(beast.pos); }
+  // beasts AI (multi) — aggro within range, status slows the chase, distant ones drift home
+  for(const b of beasts){
+    if(b.dead){ b.bb.set(b.frames[3]||b.frames[0]); b.grp.position.copy(b.pos); continue; }
+    b.bb.mesh.rotation.y=Math.atan2(camera.position.x-b.pos.x,camera.position.z-b.pos.z);
+    const stt=b.handle.status, slow=stt?(stt.def.slow||0):0;
+    const d=player.pos.distanceTo(b.pos);
+    if(b.hurt>0){ b.hurt-=dt; b.bb.set(b.frames[2]||b.frames[0]); }
+    else if(d<24 && d>3.4){ const dir=player.pos.clone().sub(b.pos).setY(0).normalize(); b.pos.addScaledVector(dir,4*(1-slow)*dt); b.bb.set(b.frames[1]||b.frames[0]); }
+    else { b.bb.set(b.frames[0]);
+      if(d>=24){ const dh=b.home.distanceTo(b.pos); if(dh>1.5){ const dir=b.home.clone().sub(b.pos).setY(0).normalize(); b.pos.addScaledVector(dir,1.6*dt); } } }
+    b.pos.y=heightAt(b.pos.x,b.pos.z); b.grp.position.copy(b.pos);
+    b.atkCd-=dt; if(d<3.6 && b.atkCd<=0 && b.hurt<=0){ b.atkCd=1.6; hurtPlayer(b.dmg,b); }
+  }
   // interaction detection
   nearest=null; let best=1e9;
   for(const it of interactables){ if(!it.enabled)continue; const d=Math.hypot(player.pos.x-it.pos.x,player.pos.z-it.pos.z); if(d<it.radius && d<best){best=d;nearest=it;} }

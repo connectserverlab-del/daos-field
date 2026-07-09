@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "_doc": "Data-driven elemental Qi attack system. Elements define palette + environmental SIGNATURE (how the world reacts). Techniques define the mechanical shape (kind/damage/range) and reference reusable VFX layers. The QiEngine (qi.js) interprets all of this generically — no per-attack code. Add a new element or technique by adding data here; the engine needs no changes.",
+
+  "textures": {
+    "smoke":  "./assets/vfx_smoke.webp",
+    "dust":   "./assets/vfx_dust.webp",
+    "splash": "./assets/vfx_splash.webp",
+    "leaf":   "./assets/vfx_leaf.webp",
+    "scorch": "./assets/decal_scorch.webp",
+    "crack":  "./assets/decal_crack.webp",
+    "hollow": "./assets/vfx_hollow.webp"
+  },
+
+  "statusEffects": {
+    "burning":    { "name": "Burning",    "color": "#ff6a2a", "duration": 4.0, "dps": 7,  "slow": 0,    "damageTaken": 1.0, "tick": ["embers"],  "desc": "Scorched flesh loses HP over time." },
+    "soaked":     { "name": "Soaked",     "color": "#4aa6ef", "duration": 5.0, "dps": 0,  "slow": 0.35, "damageTaken": 1.25,"tick": ["drip"],    "desc": "Waterlogged: slowed and takes more damage." },
+    "staggered":  { "name": "Staggered",  "color": "#c79a5b", "duration": 2.2, "dps": 0,  "slow": 0.7,  "damageTaken": 1.1, "tick": ["dustpuff"],"desc": "Earth grips the legs: heavily slowed." },
+    "entangled":  { "name": "Entangled",  "color": "#54c07a", "duration": 4.0, "dps": 4,  "slow": 0.55, "damageTaken": 1.0, "tick": ["leafmote"],"desc": "Roots bind and drain life." },
+    "sundered":   { "name": "Sundered",   "color": "#e8c53a", "duration": 5.0, "dps": 0,  "slow": 0,    "damageTaken": 1.4, "tick": ["glint"],   "desc": "Armor split — all damage bites deeper." },
+    "exposed":    { "name": "Exposed",    "color": "#bfe8d4", "duration": 3.0, "dps": 0,  "slow": 0.15, "damageTaken": 1.2, "tick": ["gustmote"],"desc": "Battered off balance and open to hits." },
+    "shocked":    { "name": "Shocked",    "color": "#c9a6ff", "duration": 3.5, "dps": 6,  "slow": 0.25, "damageTaken": 1.15,"tick": ["spark"],   "desc": "Arcing current: paralytic ticks of damage." },
+    "unraveled":  { "name": "Unraveled",  "color": "#a020f0", "duration": 4.0, "dps": 5,  "slow": 0.4,  "damageTaken": 1.5, "tick": ["glint"],   "desc": "Space itself frays around the target — vastly more vulnerable and slowed." }
+  },
+
+  "elements": {
+    "fire": {
+      "name": "Fire", "rarity": "common", "glyph": "火",
+      "color": "#ff5a26", "color2": "#ffd27a", "status": "burning",
+      "signature": ["heatShimmer", "embers", "smoke", "scorch"],
+      "sound": "roar",
+      "palette": {
+        "core":   { "tex": "glow",  "color": "#ffd27a", "color2": "#ff4a1e", "blend": "add" },
+        "trail":  { "tex": "smoke", "color": "#e88a4a", "color2": "#3a2a24", "blend": "normal" },
+        "impact": { "tex": "glow",  "color": "#ffb060", "color2": "#ff3a12", "blend": "add" }
+      }
+    },
+    "water": {
+      "name": "Water", "rarity": "common", "glyph": "水",
+      "color": "#3aa0ef", "color2": "#bfe6ff", "status": "soaked",
+      "signature": ["mist", "splash", "wet", "ripple"],
+      "sound": "rush",
+      "palette": {
+        "core":   { "tex": "glow",   "color": "#bfe6ff", "color2": "#2f7fd6", "blend": "add" },
+        "trail":  { "tex": "splash", "color": "#bfe6ff", "color2": "#5aa6e0", "blend": "normal" },
+        "impact": { "tex": "splash", "color": "#dff2ff", "color2": "#3a8fd6", "blend": "normal" }
+      }
+    },
+    "earth": {
+      "name": "Earth", "rarity": "common", "glyph": "土",
+      "color": "#c79a5b", "color2": "#e8cfa0", "status": "staggered",
+      "signature": ["dust", "crack", "debris"],
+      "sound": "rumble",
+      "palette": {
+        "core":   { "tex": "dust",  "color": "#d8b076", "color2": "#7a5a34", "blend": "normal" },
+        "trail":  { "tex": "dust",  "color": "#caa670", "color2": "#8a6a40", "blend": "normal" },
+        "impact": { "tex": "dust",  "color": "#e0c088", "color2": "#6a4e2c", "blend": "normal" }
+      }
+    },
+    "wood": {
+      "name": "Wood", "rarity": "common", "glyph": "木",
+      "color": "#54c07a", "color2": "#b8e89a", "status": "entangled",
+      "signature": ["leaves", "roots", "growth"],
+      "sound": "creak",
+      "palette": {
+        "core":   { "tex": "glow",  "color": "#b8e89a", "color2": "#2f8f4a", "blend": "add" },
+        "trail":  { "tex": "leaf",  "color": "#8fd07a", "color2": "#3a7a3a", "blend": "normal" },
+        "impact": { "tex": "leaf",  "color": "#a8e08a", "color2": "#357a45", "blend": "normal" }
+      }
+    },
+    "gold": {
+      "name": "Gold", "rarity": "common", "glyph": "金",
+      "color": "#e8c53a", "color2": "#fff2c0", "status": "sundered",
+      "signature": ["sparks", "fragments", "ringing"],
+      "sound": "ring",
+      "palette": {
+        "core":   { "tex": "glow",  "color": "#fff2c0", "color2": "#d8a018", "blend": "add" },
+        "trail":  { "tex": "spark", "color": "#ffe8a0", "color2": "#c89818", "blend": "add" },
+        "impact": { "tex": "spark", "color": "#fff4cc", "color2": "#e0b020", "blend": "add" }
+      }
+    },
+    "wind": {
+      "name": "Wind", "rarity": "rare", "glyph": "風",
+      "color": "#bfe8d4", "color2": "#eafff6", "status": "exposed",
+      "signature": ["gust", "leaves", "dust"],
+      "sound": "whoosh",
+      "palette": {
+        "core":   { "tex": "glow",  "color": "#eafff6", "color2": "#9fd8c0", "blend": "add" },
+        "trail":  { "tex": "leaf",  "color": "#cfeadd", "color2": "#8fc0b0", "blend": "normal" },
+        "impact": { "tex": "dust",  "color": "#e0f0e8", "color2": "#a0c8b8", "blend": "normal" }
+      }
+    },
+    "lightning": {
+      "name": "Lightning", "rarity": "rare", "glyph": "雷",
+      "color": "#a86cff", "color2": "#eaddff", "status": "shocked",
+      "signature": ["arc", "sparks", "flash", "thunder"],
+      "sound": "crack",
+      "palette": {
+        "core":   { "tex": "glow",  "color": "#eaddff", "color2": "#8a4aff", "blend": "add" },
+        "trail":  { "tex": "spark", "color": "#d8c0ff", "color2": "#7a3aff", "blend": "add" },
+        "impact": { "tex": "spark", "color": "#f0e6ff", "color2": "#9a5aff", "blend": "add" }
+      }
+    },
+    "limitless": {
+      "name": "Limitless", "rarity": "mythic", "glyph": "無",
+      "color": "#a020f0", "color2": "#e6b0ff", "status": "unraveled",
+      "signature": ["implode", "sparks", "flash", "shockRing"],
+      "sound": "crack",
+      "_doc": "A mythic inheritance (unlocked with key 6 after awakening). Blue attracts, Red repels, Hollow Purple annihilates. Per-technique palettes recolour the same engine to blue / red / violet — proof the VFX layer is fully data-driven.",
+      "palette": {
+        "core":   { "tex": "hollow", "color": "#d8a0ff", "color2": "#7a1ad0", "blend": "add" },
+        "trail":  { "tex": "spark",  "color": "#c060ff", "color2": "#4a2aff", "blend": "add" },
+        "impact": { "tex": "hollow", "color": "#e6b0ff", "color2": "#8a2ae0", "blend": "add" }
+      }
+    }
+  },
+
+  "techniques": {
+
+    "fire_basic":   { "element": "fire", "kind": "projectile", "tier": "basic",   "name": "Cinder Bolt",      "desc": "A compressed mote of qi-fire — leaves scorch and drifting smoke where it lands.", "qiCost": 12, "cooldown": 0.45, "damage": 14, "speed": 34, "range": 26, "radius": 2.4, "knockback": 2, "status": { "apply": "burning", "chance": 0.55 }, "environment": ["scorch", "embers", "smoke", "heatShimmer"], "light": { "intensity": 5, "range": 12, "life": 0.5, "flicker": 0.4 }, "camera": { "shake": 0.3, "dur": 0.14 }, "upgrade": { "ranks": [ { "damage": 14, "status": 0.55 }, { "damage": 20, "status": 0.7, "add": ["ember_trail"] }, { "damage": 28, "status": 0.9, "radius": 3.2 } ] } },
+    "fire_charged": { "element": "fire", "kind": "projectile", "tier": "charged", "name": "Blazing Lance",     "desc": "A held spear of roaring flame that punches through, throwing a wall of heat distortion and smoke.", "qiCost": 26, "cooldown": 1.4, "charge": 1.1, "damage": 34, "speed": 40, "range": 34, "radius": 3.6, "knockback": 5, "status": { "apply": "burning", "chance": 0.9 }, "environment": ["scorch", "embers", "smoke", "heatShimmer", "debris"], "light": { "intensity": 9, "range": 18, "life": 0.7, "flicker": 0.5 }, "camera": { "shake": 0.6, "dur": 0.25 }, "upgrade": { "ranks": [ { "damage": 34 }, { "damage": 46, "radius": 4.4 }, { "damage": 60, "radius": 5.2, "add": ["fire_pillar"] } ] } },
+    "fire_area":    { "element": "fire", "kind": "area",       "tier": "area",    "name": "Immolation Field", "desc": "Qi ignites the ground itself — a spreading field of fire that leaves the earth blackened.", "qiCost": 34, "cooldown": 3.0, "telegraph": 0.4, "damage": 26, "range": 10, "radius": 6.5, "knockback": 3, "status": { "apply": "burning", "chance": 1.0 }, "environment": ["scorch", "embers", "smoke", "heatShimmer", "shockRing"], "light": { "intensity": 12, "range": 24, "life": 1.2, "flicker": 0.6 }, "camera": { "shake": 0.8, "dur": 0.4 }, "upgrade": { "ranks": [ { "radius": 6.5 }, { "radius": 8, "damage": 34 }, { "radius": 9.5, "damage": 44, "add": ["fire_wave"] } ] } },
+    "fire_defense": { "element": "fire", "kind": "buff",       "tier": "defense", "name": "Ember Ward",       "desc": "A shell of circling embers that sears whatever strikes it and shrugs off blows.", "qiCost": 22, "cooldown": 6.0, "buff": { "self": "guard", "damageReduce": 0.4, "duration": 6, "retaliate": 6, "retaliateStatus": "burning" }, "environment": ["embers", "smoke", "barrier"], "light": { "intensity": 4, "range": 8, "life": 6, "flicker": 0.5 }, "camera": { "shake": 0.15, "dur": 0.1 }, "upgrade": { "ranks": [ { "damageReduce": 0.4 }, { "damageReduce": 0.5, "retaliate": 10 }, { "damageReduce": 0.6, "retaliate": 16 } ] } },
+    "fire_utility": { "element": "fire", "kind": "dash",       "tier": "utility", "name": "Flame Step",       "desc": "Blink forward on a jet of fire, leaving a burning footprint of scorch and smoke.", "qiCost": 16, "cooldown": 2.0, "dashDist": 12, "dashTime": 0.22, "environment": ["scorch", "embers", "smoke", "heatShimmer"], "light": { "intensity": 5, "range": 10, "life": 0.5, "flicker": 0.4 }, "camera": { "shake": 0.25, "dur": 0.12 }, "upgrade": { "ranks": [ { "dashDist": 12 }, { "dashDist": 16 }, { "dashDist": 20, "add": ["fire_trail_dmg"] } ] } },
+
+    "water_basic":   { "element": "water", "kind": "projectile", "tier": "basic",   "name": "Torrent Jet",     "desc": "A lance of pressurized water that bursts into spray and leaves the ground slick.", "qiCost": 11, "cooldown": 0.4, "damage": 12, "speed": 38, "range": 28, "radius": 2.2, "knockback": 4, "status": { "apply": "soaked", "chance": 0.6 }, "environment": ["splash", "wet", "mist", "ripple"], "light": { "intensity": 2, "range": 8, "life": 0.3, "flicker": 0.1, "color": "#bfe6ff" }, "camera": { "shake": 0.25, "dur": 0.12 }, "upgrade": { "ranks": [ { "damage": 12, "knockback": 4 }, { "damage": 17, "knockback": 6 }, { "damage": 24, "knockback": 8, "add": ["water_pierce"] } ] } },
+    "water_charged": { "element": "water", "kind": "projectile", "tier": "charged", "name": "Surging Wave",     "desc": "A gathered crescent of water that hurls the target back in a sheet of spray.", "qiCost": 24, "cooldown": 1.3, "charge": 1.0, "damage": 28, "speed": 30, "range": 30, "radius": 4.5, "knockback": 9, "status": { "apply": "soaked", "chance": 1.0 }, "environment": ["splash", "wet", "mist", "ripple", "shockRing"], "light": { "intensity": 3, "range": 12, "life": 0.5, "flicker": 0.1, "color": "#bfe6ff" }, "camera": { "shake": 0.5, "dur": 0.22 }, "upgrade": { "ranks": [ { "damage": 28 }, { "damage": 38, "knockback": 12 }, { "damage": 50, "radius": 5.5 } ] } },
+    "water_area":    { "element": "water", "kind": "area",       "tier": "area",    "name": "Tidewash",        "desc": "A collapsing ring of water floods outward, drenching and shoving everything caught.", "qiCost": 32, "cooldown": 2.8, "telegraph": 0.35, "damage": 22, "range": 9, "radius": 7, "knockback": 10, "status": { "apply": "soaked", "chance": 1.0 }, "environment": ["splash", "wet", "mist", "ripple", "shockRing"], "light": { "intensity": 3, "range": 16, "life": 0.8, "color": "#bfe6ff" }, "camera": { "shake": 0.7, "dur": 0.35 }, "upgrade": { "ranks": [ { "radius": 7 }, { "radius": 8.5, "knockback": 14 }, { "radius": 10, "damage": 32 } ] } },
+    "water_defense": { "element": "water", "kind": "buff",       "tier": "defense", "name": "Mirror Veil",     "desc": "A shimmering veil of mist that refracts blows aside and blurs the cultivator's form.", "qiCost": 20, "cooldown": 6.0, "buff": { "self": "guard", "damageReduce": 0.45, "duration": 6, "retaliate": 0 }, "environment": ["mist", "wet", "barrier"], "light": { "intensity": 2, "range": 7, "life": 6, "color": "#bfe6ff" }, "camera": { "shake": 0.1, "dur": 0.1 }, "upgrade": { "ranks": [ { "damageReduce": 0.45 }, { "damageReduce": 0.55 }, { "damageReduce": 0.65, "add": ["cleanse"] } ] } },
+    "water_utility": { "element": "water", "kind": "dash",       "tier": "utility", "name": "Flowing Step",    "desc": "Dissolve into water and reform ahead, trailing spray and leaving wet footprints.", "qiCost": 14, "cooldown": 1.8, "dashDist": 13, "dashTime": 0.2, "environment": ["splash", "wet", "mist"], "light": { "intensity": 2, "range": 8, "life": 0.4, "color": "#bfe6ff" }, "camera": { "shake": 0.15, "dur": 0.1 }, "upgrade": { "ranks": [ { "dashDist": 13 }, { "dashDist": 17 }, { "dashDist": 21 } ] } },
+
+    "earth_basic":   { "element": "earth", "kind": "projectile", "tier": "basic",   "name": "Stone Shard",     "desc": "A shard of raised rock hammers the target and kicks up a cloud of dust.", "qiCost": 12, "cooldown": 0.5, "damage": 16, "speed": 28, "range": 22, "radius": 2.4, "knockback": 3, "status": { "apply": "staggered", "chance": 0.5 }, "environment": ["dust", "crack", "debris"], "light": null, "camera": { "shake": 0.4, "dur": 0.18 }, "upgrade": { "ranks": [ { "damage": 16 }, { "damage": 22, "status": 0.7 }, { "damage": 30, "radius": 3.2 } ] } },
+    "earth_charged": { "element": "earth", "kind": "projectile", "tier": "charged", "name": "Boulder Hurl",     "desc": "A wrenched slab of earth flung with crushing weight, cratering the ground on impact.", "qiCost": 26, "cooldown": 1.6, "charge": 1.2, "damage": 38, "speed": 22, "range": 26, "radius": 4, "knockback": 7, "status": { "apply": "staggered", "chance": 0.9 }, "environment": ["dust", "crack", "debris", "liftStones", "shockRing"], "light": null, "camera": { "shake": 0.9, "dur": 0.35 }, "upgrade": { "ranks": [ { "damage": 38 }, { "damage": 50, "radius": 5 }, { "damage": 66, "radius": 6 } ] } },
+    "earth_area":    { "element": "earth", "kind": "area",       "tier": "area",    "name": "Fissure",         "desc": "The ground splits in a spreading web of cracks, hurling stones and staggering all above.", "qiCost": 34, "cooldown": 3.2, "telegraph": 0.5, "damage": 28, "range": 8, "radius": 7, "knockback": 5, "status": { "apply": "staggered", "chance": 1.0 }, "environment": ["dust", "crack", "debris", "liftStones", "shockRing"], "light": null, "camera": { "shake": 1.1, "dur": 0.5 }, "upgrade": { "ranks": [ { "radius": 7 }, { "radius": 8.5, "damage": 36 }, { "radius": 10, "damage": 46 } ] } },
+    "earth_defense": { "element": "earth", "kind": "buff",       "tier": "defense", "name": "Stone Skin",      "desc": "Plates of rock sheathe the body — slow but nearly unbreakable.", "qiCost": 22, "cooldown": 6.5, "buff": { "self": "guard", "damageReduce": 0.6, "duration": 7, "retaliate": 4, "retaliateStatus": "staggered" }, "environment": ["dust", "debris", "barrier"], "light": null, "camera": { "shake": 0.3, "dur": 0.15 }, "upgrade": { "ranks": [ { "damageReduce": 0.6 }, { "damageReduce": 0.7 }, { "damageReduce": 0.78, "add": ["reflect"] } ] } },
+    "earth_utility": { "element": "earth", "kind": "dash",       "tier": "utility", "name": "Earthen Surge",    "desc": "Ride a rolling swell of ground forward, throwing debris and cracking the earth behind.", "qiCost": 16, "cooldown": 2.2, "dashDist": 11, "dashTime": 0.26, "environment": ["dust", "crack", "debris"], "light": null, "camera": { "shake": 0.5, "dur": 0.2 }, "upgrade": { "ranks": [ { "dashDist": 11 }, { "dashDist": 14 }, { "dashDist": 18, "add": ["quake"] } ] } },
+
+    "wood_basic":   { "element": "wood", "kind": "projectile", "tier": "basic",   "name": "Thorn Lash",       "desc": "A whipping thorned tendril that snaps out and drinks a little life.", "qiCost": 11, "cooldown": 0.45, "damage": 12, "speed": 30, "range": 24, "radius": 2.2, "knockback": 1, "status": { "apply": "entangled", "chance": 0.6 }, "environment": ["leaves", "growth"], "light": { "intensity": 2, "range": 7, "life": 0.3, "color": "#b8e89a" }, "camera": { "shake": 0.2, "dur": 0.1 }, "upgrade": { "ranks": [ { "damage": 12 }, { "damage": 17, "add": ["lifesteal"] }, { "damage": 24, "status": 0.9 } ] } },
+    "wood_charged": { "element": "wood", "kind": "projectile", "tier": "charged", "name": "Bramble Spear",     "desc": "A hardened lance of living wood that bursts into grasping brambles on impact.", "qiCost": 24, "cooldown": 1.4, "charge": 1.0, "damage": 30, "speed": 26, "range": 28, "radius": 3.5, "knockback": 3, "status": { "apply": "entangled", "chance": 1.0 }, "environment": ["leaves", "roots", "growth"], "light": { "intensity": 3, "range": 10, "life": 0.5, "color": "#b8e89a" }, "camera": { "shake": 0.4, "dur": 0.2 }, "upgrade": { "ranks": [ { "damage": 30 }, { "damage": 40 }, { "damage": 54, "add": ["seed_burst"] } ] } },
+    "wood_area":    { "element": "wood", "kind": "area",       "tier": "area",    "name": "Verdant Snare",    "desc": "Roots erupt from the soil, binding and draining everything in the grove.", "qiCost": 32, "cooldown": 3.0, "telegraph": 0.5, "damage": 20, "range": 9, "radius": 6.5, "knockback": 0, "status": { "apply": "entangled", "chance": 1.0 }, "environment": ["leaves", "roots", "growth", "shockRing"], "light": { "intensity": 3, "range": 14, "life": 0.8, "color": "#b8e89a" }, "camera": { "shake": 0.5, "dur": 0.3 }, "upgrade": { "ranks": [ { "radius": 6.5 }, { "radius": 8, "damage": 28 }, { "radius": 9.5, "damage": 36 } ] } },
+    "wood_defense": { "element": "wood", "kind": "buff",       "tier": "defense", "name": "Living Bark",      "desc": "Bark grows over the skin, turning blows and slowly knitting wounds closed.", "qiCost": 20, "cooldown": 7.0, "buff": { "self": "guard", "damageReduce": 0.4, "duration": 7, "regen": 5 }, "environment": ["leaves", "growth", "barrier"], "light": { "intensity": 2, "range": 7, "life": 7, "color": "#b8e89a" }, "camera": { "shake": 0.1, "dur": 0.1 }, "upgrade": { "ranks": [ { "damageReduce": 0.4, "regen": 5 }, { "damageReduce": 0.5, "regen": 8 }, { "damageReduce": 0.55, "regen": 12 } ] } },
+    "wood_utility": { "element": "wood", "kind": "dash",       "tier": "utility", "name": "Vine Pull",        "desc": "Fling a vine and haul yourself forward, sprouting greenery along the path.", "qiCost": 14, "cooldown": 2.0, "dashDist": 14, "dashTime": 0.2, "environment": ["leaves", "roots", "growth"], "light": { "intensity": 2, "range": 8, "life": 0.4, "color": "#b8e89a" }, "camera": { "shake": 0.15, "dur": 0.1 }, "upgrade": { "ranks": [ { "dashDist": 14 }, { "dashDist": 18 }, { "dashDist": 22 } ] } },
+
+    "gold_basic":   { "element": "gold", "kind": "projectile", "tier": "basic",   "name": "Golden Edge",       "desc": "A honed crescent of metal qi that rings on impact and splits armor.", "qiCost": 12, "cooldown": 0.4, "damage": 15, "speed": 44, "range": 26, "radius": 2, "knockback": 2, "status": { "apply": "sundered", "chance": 0.5 }, "environment": ["sparks", "fragments", "ringing"], "light": { "intensity": 3, "range": 8, "life": 0.3, "color": "#fff2c0", "flicker": 0.6 }, "camera": { "shake": 0.3, "dur": 0.12 }, "upgrade": { "ranks": [ { "damage": 15 }, { "damage": 21, "status": 0.7 }, { "damage": 29, "add": ["twin_edge"] } ] } },
+    "gold_charged": { "element": "gold", "kind": "projectile", "tier": "charged", "name": "Piercing Lance",     "desc": "A drawn spike of condensed metal that punches clean through and shatters into fragments.", "qiCost": 25, "cooldown": 1.3, "charge": 0.9, "damage": 34, "speed": 52, "range": 34, "radius": 3, "knockback": 4, "status": { "apply": "sundered", "chance": 1.0 }, "environment": ["sparks", "fragments", "ringing"], "light": { "intensity": 4, "range": 10, "life": 0.4, "color": "#fff2c0", "flicker": 0.6 }, "camera": { "shake": 0.5, "dur": 0.2 }, "upgrade": { "ranks": [ { "damage": 34 }, { "damage": 46 }, { "damage": 62, "add": ["pierce_all"] } ] } },
+    "gold_area":    { "element": "gold", "kind": "area",       "tier": "area",    "name": "Blade Storm",      "desc": "A whirling cloud of metal fragments scours everything nearby, ringing like struck bells.", "qiCost": 33, "cooldown": 3.0, "telegraph": 0.3, "damage": 24, "range": 8, "radius": 6, "knockback": 3, "status": { "apply": "sundered", "chance": 1.0 }, "environment": ["sparks", "fragments", "ringing", "shockRing"], "light": { "intensity": 5, "range": 16, "life": 0.7, "color": "#fff2c0", "flicker": 0.6 }, "camera": { "shake": 0.7, "dur": 0.3 }, "upgrade": { "ranks": [ { "radius": 6 }, { "radius": 7.5, "damage": 32 }, { "radius": 9, "damage": 42 } ] } },
+    "gold_defense": { "element": "gold", "kind": "buff",       "tier": "defense", "name": "Aegis Barrier",     "desc": "A dome of golden metal qi that turns strikes and flings shards back at the attacker.", "qiCost": 22, "cooldown": 6.0, "buff": { "self": "guard", "damageReduce": 0.55, "duration": 6, "retaliate": 10, "retaliateStatus": "sundered" }, "environment": ["sparks", "fragments", "barrier", "ringing"], "light": { "intensity": 4, "range": 9, "life": 6, "color": "#fff2c0", "flicker": 0.4 }, "camera": { "shake": 0.2, "dur": 0.12 }, "upgrade": { "ranks": [ { "damageReduce": 0.55, "retaliate": 10 }, { "damageReduce": 0.62, "retaliate": 16 }, { "damageReduce": 0.7, "retaliate": 24 } ] } },
+    "gold_utility": { "element": "gold", "kind": "dash",       "tier": "utility", "name": "Gale of Steel",     "desc": "Streak forward as a blade of metal qi, sparks and a ringing note trailing behind.", "qiCost": 15, "cooldown": 1.8, "dashDist": 15, "dashTime": 0.18, "damage": 10, "radius": 2.2, "status": { "apply": "sundered", "chance": 0.5 }, "environment": ["sparks", "fragments", "ringing"], "light": { "intensity": 3, "range": 8, "life": 0.3, "color": "#fff2c0", "flicker": 0.6 }, "camera": { "shake": 0.3, "dur": 0.14 }, "upgrade": { "ranks": [ { "dashDist": 15, "damage": 10 }, { "dashDist": 19, "damage": 16 }, { "dashDist": 23, "damage": 24 } ] } },
+
+    "wind_basic":   { "element": "wind", "kind": "projectile", "tier": "basic",   "name": "Gust Cutter",       "desc": "An invisible edge of compressed air that flattens grass and shoves the target off balance.", "qiCost": 10, "cooldown": 0.35, "damage": 11, "speed": 50, "range": 30, "radius": 2.4, "knockback": 6, "status": { "apply": "exposed", "chance": 0.6 }, "environment": ["gust", "leaves", "dust"], "light": null, "camera": { "shake": 0.2, "dur": 0.1 }, "upgrade": { "ranks": [ { "damage": 11, "knockback": 6 }, { "damage": 16, "knockback": 9 }, { "damage": 22, "knockback": 12 } ] } },
+    "wind_charged": { "element": "wind", "kind": "projectile", "tier": "charged", "name": "Cyclone Fang",       "desc": "A spinning fang of wind that drills the target and tears leaves into a spiral.", "qiCost": 22, "cooldown": 1.2, "charge": 0.9, "damage": 26, "speed": 46, "range": 34, "radius": 3.4, "knockback": 11, "status": { "apply": "exposed", "chance": 1.0 }, "environment": ["gust", "leaves", "dust"], "light": null, "camera": { "shake": 0.45, "dur": 0.2 }, "upgrade": { "ranks": [ { "damage": 26 }, { "damage": 35, "knockback": 15 }, { "damage": 48, "radius": 4.2 } ] } },
+    "wind_area":    { "element": "wind", "kind": "area",       "tier": "area",    "name": "Tempest",          "desc": "A bursting vortex that hurls everything outward in a storm of leaves and dust.", "qiCost": 30, "cooldown": 2.6, "telegraph": 0.3, "damage": 18, "range": 9, "radius": 7.5, "knockback": 16, "status": { "apply": "exposed", "chance": 1.0 }, "environment": ["gust", "leaves", "dust", "shockRing"], "light": null, "camera": { "shake": 0.7, "dur": 0.35 }, "upgrade": { "ranks": [ { "radius": 7.5 }, { "radius": 9, "knockback": 20 }, { "radius": 10.5, "damage": 26 } ] } },
+    "wind_defense": { "element": "wind", "kind": "buff",       "tier": "defense", "name": "Zephyr Shroud",     "desc": "A cloak of swirling wind that deflects blows and speeds the cultivator's step.", "qiCost": 18, "cooldown": 5.5, "buff": { "self": "guard", "damageReduce": 0.35, "duration": 5, "moveBoost": 1.3 }, "environment": ["gust", "leaves", "barrier"], "light": null, "camera": { "shake": 0.1, "dur": 0.1 }, "upgrade": { "ranks": [ { "damageReduce": 0.35, "moveBoost": 1.3 }, { "damageReduce": 0.42, "moveBoost": 1.45 }, { "damageReduce": 0.5, "moveBoost": 1.6 } ] } },
+    "wind_utility": { "element": "wind", "kind": "dash",       "tier": "utility", "name": "Gale Step",        "desc": "A long, near-instant glide on the wind, scattering leaves and dust in your wake.", "qiCost": 12, "cooldown": 1.4, "dashDist": 20, "dashTime": 0.16, "environment": ["gust", "leaves", "dust"], "light": null, "camera": { "shake": 0.15, "dur": 0.1 }, "upgrade": { "ranks": [ { "dashDist": 20 }, { "dashDist": 25 }, { "dashDist": 30, "add": ["double_step"] } ] } },
+
+    "lightning_basic":   { "element": "lightning", "kind": "projectile", "tier": "basic",   "name": "Levin Spark",  "desc": "A near-instant arc of qi-lightning that lights the field white and cracks like a whip.", "qiCost": 12, "cooldown": 0.5, "damage": 15, "speed": 70, "range": 30, "radius": 2, "knockback": 2, "status": { "apply": "shocked", "chance": 0.55 }, "environment": ["arc", "sparks", "flash"], "light": { "intensity": 8, "range": 20, "life": 0.2, "color": "#eaddff", "flicker": 0.9 }, "camera": { "shake": 0.35, "dur": 0.12 }, "sound": "crack", "upgrade": { "ranks": [ { "damage": 15 }, { "damage": 21, "status": 0.75 }, { "damage": 30, "add": ["chain"] } ] } },
+    "lightning_charged": { "element": "lightning", "kind": "projectile", "tier": "charged", "name": "Thunderclap Bolt", "desc": "A gathered bolt that detonates with a delayed peal of thunder and blinding flash.", "qiCost": 26, "cooldown": 1.5, "charge": 1.0, "damage": 36, "speed": 80, "range": 36, "radius": 3.5, "knockback": 5, "status": { "apply": "shocked", "chance": 1.0 }, "environment": ["arc", "sparks", "flash", "thunder"], "light": { "intensity": 14, "range": 30, "life": 0.3, "color": "#eaddff", "flicker": 0.9 }, "camera": { "shake": 0.7, "dur": 0.25 }, "sound": "crack", "upgrade": { "ranks": [ { "damage": 36 }, { "damage": 48, "radius": 4.5 }, { "damage": 66, "add": ["chain"] } ] } },
+    "lightning_area":    { "element": "lightning", "kind": "area",       "tier": "area",    "name": "Storm Nexus",  "desc": "A pillar of lightning roots to the ground, spitting chained arcs across everything near.", "qiCost": 34, "cooldown": 3.2, "telegraph": 0.35, "damage": 26, "range": 9, "radius": 6.5, "knockback": 3, "status": { "apply": "shocked", "chance": 1.0 }, "environment": ["arc", "sparks", "flash", "thunder", "shockRing"], "light": { "intensity": 16, "range": 34, "life": 0.9, "color": "#eaddff", "flicker": 0.9 }, "camera": { "shake": 0.9, "dur": 0.4 }, "sound": "crack", "upgrade": { "ranks": [ { "radius": 6.5 }, { "radius": 8, "damage": 34 }, { "radius": 9.5, "damage": 44 } ] } },
+    "lightning_defense": { "element": "lightning", "kind": "buff",       "tier": "defense", "name": "Static Field", "desc": "A crackling field that shocks any attacker who dares to close in.", "qiCost": 22, "cooldown": 6.0, "buff": { "self": "guard", "damageReduce": 0.35, "duration": 5, "retaliate": 12, "retaliateStatus": "shocked" }, "environment": ["arc", "sparks", "barrier"], "light": { "intensity": 5, "range": 10, "life": 5, "color": "#eaddff", "flicker": 0.8 }, "camera": { "shake": 0.2, "dur": 0.12 }, "upgrade": { "ranks": [ { "damageReduce": 0.35, "retaliate": 12 }, { "damageReduce": 0.42, "retaliate": 18 }, { "damageReduce": 0.5, "retaliate": 26 } ] } },
+    "lightning_utility": { "element": "lightning", "kind": "dash",       "tier": "utility", "name": "Flash Step",   "desc": "Vanish in a crack of light and reappear ahead, leaving a scorched arc behind.", "qiCost": 15, "cooldown": 1.6, "dashDist": 18, "dashTime": 0.12, "environment": ["arc", "sparks", "flash"], "light": { "intensity": 8, "range": 16, "life": 0.2, "color": "#eaddff", "flicker": 0.9 }, "camera": { "shake": 0.3, "dur": 0.12 }, "sound": "crack", "upgrade": { "ranks": [ { "dashDist": 18 }, { "dashDist": 23 }, { "dashDist": 28, "add": ["after_shock"] } ] } },
+
+    "limitless_basic":   { "element": "limitless", "kind": "area", "tier": "basic", "name": "Lapse: Blue", "desc": "Cursed technique Lapse — a point of negative energy that drags everything toward it and crushes inward.", "qiCost": 20, "cooldown": 1.2, "telegraph": 0.25, "damage": 22, "range": 12, "radius": 6, "pull": true, "knockback": 9, "status": { "apply": "unraveled", "chance": 0.7 }, "color": "#2a6cff", "color2": "#bfe6ff", "palette": { "core": { "tex": "glow", "color": "#dff0ff", "color2": "#1f5ae6", "blend": "add" }, "impact": { "tex": "glow", "color": "#bfe6ff", "color2": "#2a6cff", "blend": "add" } }, "environment": ["implode", "sparks", "shockRing"], "light": { "intensity": 9, "range": 20, "life": 0.6, "flicker": 0.4, "color": "#4a8cff" }, "camera": { "shake": 0.6, "dur": 0.25 }, "upgrade": { "ranks": [ { "damage": 22, "radius": 6 }, { "damage": 30, "radius": 7.5 }, { "damage": 40, "radius": 9 } ] } },
+    "limitless_charged": { "element": "limitless", "kind": "area", "tier": "charged", "name": "Reversal: Red", "desc": "Cursed technique Reversal — positive energy erupts, hurling everything violently outward.", "qiCost": 26, "cooldown": 1.6, "charge": 0.9, "telegraph": 0.2, "damage": 30, "range": 10, "radius": 7, "knockback": 20, "status": { "apply": "unraveled", "chance": 0.7 }, "color": "#ff2a3a", "color2": "#ffc0b0", "palette": { "core": { "tex": "glow", "color": "#ffd0c0", "color2": "#e01020", "blend": "add" }, "impact": { "tex": "glow", "color": "#ffb0a0", "color2": "#ff2a3a", "blend": "add" } }, "environment": ["shockRing", "debris", "dust", "sparks"], "light": { "intensity": 12, "range": 24, "life": 0.6, "flicker": 0.5, "color": "#ff3a2a" }, "camera": { "shake": 0.9, "dur": 0.35 }, "upgrade": { "ranks": [ { "damage": 30, "knockback": 20 }, { "damage": 40, "knockback": 26 }, { "damage": 54, "knockback": 32 } ] } },
+    "limitless_area":    { "element": "limitless", "kind": "projectile", "tier": "area", "name": "Hollow Purple", "desc": "Blue and Red collide into imaginary mass — a roaring violet sphere that erases the ground it crosses.", "qiCost": 45, "cooldown": 4.5, "charge": 1.4, "damage": 90, "speed": 30, "range": 40, "radius": 6, "knockback": 16, "status": { "apply": "unraveled", "chance": 1.0 }, "environment": ["flash", "shockRing", "scorch", "crack", "debris", "smoke", "sparks", "implode"], "light": { "intensity": 22, "range": 40, "life": 0.8, "flicker": 0.7, "color": "#c060ff" }, "camera": { "shake": 1.4, "dur": 0.6 }, "upgrade": { "ranks": [ { "damage": 90, "radius": 6 }, { "damage": 130, "radius": 7.5 }, { "damage": 190, "radius": 9 } ] } },
+    "limitless_defense": { "element": "limitless", "kind": "buff", "tier": "defense", "name": "Infinity", "desc": "The Limitless made manifest — an infinite series between you and every blow. Nothing quite reaches.", "qiCost": 30, "cooldown": 8.0, "buff": { "self": "guard", "damageReduce": 0.9, "duration": 5, "retaliate": 0 }, "color": "#7a6cff", "color2": "#dfe0ff", "palette": { "core": { "tex": "glow", "color": "#dfe0ff", "color2": "#5a4aff", "blend": "add" } }, "environment": ["sparks", "barrier", "implode"], "light": { "intensity": 5, "range": 10, "life": 5, "flicker": 0.3, "color": "#8a7aff" }, "camera": { "shake": 0.2, "dur": 0.12 }, "upgrade": { "ranks": [ { "damageReduce": 0.9 }, { "damageReduce": 0.95 }, { "damageReduce": 0.98 } ] } },
+    "limitless_utility": { "element": "limitless", "kind": "dash", "tier": "utility", "name": "Blue Step", "desc": "Fold the space ahead and slip through it — a blink on a thread of attraction.", "qiCost": 18, "cooldown": 1.4, "dashDist": 22, "dashTime": 0.14, "damage": 14, "radius": 3, "status": { "apply": "unraveled", "chance": 0.5 }, "color": "#2a6cff", "color2": "#bfe6ff", "palette": { "core": { "tex": "glow", "color": "#dff0ff", "color2": "#2a6cff", "blend": "add" } }, "environment": ["sparks", "implode"], "light": { "intensity": 7, "range": 14, "life": 0.3, "flicker": 0.5, "color": "#4a8cff" }, "camera": { "shake": 0.3, "dur": 0.12 }, "upgrade": { "ranks": [ { "dashDist": 22, "damage": 14 }, { "dashDist": 27, "damage": 20 }, { "dashDist": 32, "damage": 28 } ] } }
+  }
+}
