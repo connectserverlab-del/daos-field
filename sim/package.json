@@ -1,0 +1,8 @@
+{
+  "name": "daos-field-sim",
+  "version": "0.1.0",
+  "description": "DAO'S FIELD cultivation system — engine-agnostic reference implementation (15 Heavenly Cards, Aura, character stats, cultivation experience, realm advancement).",
+  "type": "module",
+  "scripts": { "test": "node test/run.js" },
+  "license": "UNLICENSED"
+}

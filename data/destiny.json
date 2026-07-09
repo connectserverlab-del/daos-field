@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "_comment": "The 6 Destiny Cards. Each aspect rolls a grade; the roll is bounded (never below floorGrade), so no destiny is 'unfun'. Grade 'mult' feeds character-stat derivation; 'affects' documents which stats each aspect drives.",
+  "aspects": [
+    { "id": "physique",       "name": "Physique",       "affects": ["vitality", "attack", "defense"] },
+    { "id": "spiritual_root", "name": "Spiritual Root", "affects": ["qi", "cultivationSpeed"] },
+    { "id": "soul",           "name": "Soul",           "affects": ["spirit", "qi"] },
+    { "id": "comprehension",  "name": "Comprehension",  "affects": ["comprehension", "cultivationSpeed"] },
+    { "id": "luck",           "name": "Luck",           "affects": ["luck", "tribulation"] },
+    { "id": "destiny",        "name": "Destiny",        "affects": ["luck", "global"] }
+  ],
+  "grades": [
+    { "g": 1, "id": "mortal",   "name": "Mortal",   "weight": 26, "mult": 0.90 },
+    { "g": 2, "id": "common",   "name": "Common",   "weight": 30, "mult": 1.00 },
+    { "g": 3, "id": "uncommon", "name": "Uncommon", "weight": 22, "mult": 1.12 },
+    { "g": 4, "id": "rare",     "name": "Rare",     "weight": 14, "mult": 1.28 },
+    { "g": 5, "id": "epic",     "name": "Epic",     "weight": 6,  "mult": 1.50 },
+    { "g": 6, "id": "heavenly", "name": "Heavenly", "weight": 2,  "mult": 1.80 }
+  ],
+  "floorGrade": 1
+}

@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "_comment": "Heavenly Card draw config: 9 element + 6 destiny = 15 cards. Element cards are drawn from the mortal-start drawable rarities, weighted so duplicates occur (the bounded draw — Aura never falls below Red). Legendary/Mythic elements are not drawable at the mortal start.",
+  "elementCardCount": 9,
+  "destinyCardCount": 6,
+  "drawableRarities": ["common", "rare", "epic"],
+  "rarityWeights": { "common": 20, "rare": 7, "epic": 2, "legendary": 0, "mythic": 0 }
+}

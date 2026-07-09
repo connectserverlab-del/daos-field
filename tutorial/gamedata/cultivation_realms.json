@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "_comment": "Ordered cultivation realms. Combat strength derives from realm; Aura scales the SPEED of progress, not the ceiling. Inserting a new realm is a data change — the engine treats this as an ordered open registry and never hardcodes realm names.",
+  "realms": [
+    {
+      "id": "qi_gathering",
+      "order": 1,
+      "name": "Qi Gathering",
+      "subStages": 9,
+      "baseProgressToAdvance": 1000,
+      "requiresTribulation": false,
+      "powerBudget": 1.0
+    },
+    {
+      "id": "foundation_establishment",
+      "order": 2,
+      "name": "Foundation Establishment",
+      "subStages": 9,
+      "baseProgressToAdvance": 4000,
+      "requiresTribulation": true,
+      "tribulation": { "type": "minor", "baseSuccess": 0.75, "failurePenalty": "in_realm_progress_loss" },
+      "powerBudget": 3.0
+    },
+    {
+      "id": "golden_core",
+      "order": 3,
+      "name": "Golden Core",
+      "subStages": 9,
+      "baseProgressToAdvance": 12000,
+      "requiresTribulation": true,
+      "tribulation": { "type": "minor", "baseSuccess": 0.65, "failurePenalty": "in_realm_progress_loss" },
+      "powerBudget": 9.0
+    },
+    {
+      "id": "nascent_soul",
+      "order": 4,
+      "name": "Nascent Soul",
+      "subStages": 9,
+      "baseProgressToAdvance": 40000,
+      "requiresTribulation": true,
+      "tribulation": { "type": "major", "baseSuccess": 0.55, "failurePenalty": "opt_in_high_stake" },
+      "powerBudget": 27.0
+    },
+    {
+      "id": "soul_formation",
+      "order": 5,
+      "name": "Soul Formation",
+      "subStages": 9,
+      "baseProgressToAdvance": 120000,
+      "requiresTribulation": true,
+      "tribulation": { "type": "major", "baseSuccess": 0.45, "failurePenalty": "opt_in_high_stake" },
+      "powerBudget": 81.0
+    },
+    {
+      "id": "spirit_severing",
+      "order": 6,
+      "name": "Spirit Severing",
+      "subStages": 9,
+      "baseProgressToAdvance": 360000,
+      "requiresTribulation": true,
+      "tribulation": { "type": "heavenly", "baseSuccess": 0.38, "failurePenalty": "opt_in_high_stake" },
+      "powerBudget": 243.0
+    },
+    {
+      "id": "dao_seeking",
+      "order": 7,
+      "name": "Dao Seeking",
+      "subStages": 9,
+      "baseProgressToAdvance": 1000000,
+      "requiresTribulation": true,
+      "tribulation": { "type": "heavenly", "baseSuccess": 0.30, "failurePenalty": "opt_in_high_stake" },
+      "powerBudget": 729.0
+    },
+    {
+      "id": "immortal_ascension",
+      "order": 8,
+      "name": "Immortal Ascension",
+      "subStages": 9,
+      "baseProgressToAdvance": 3000000,
+      "requiresTribulation": true,
+      "tribulation": { "type": "ascension", "baseSuccess": 0.22, "failurePenalty": "opt_in_high_stake", "gatesWorldLayer": "immortal_world" },
+      "powerBudget": 2187.0
+    }
+  ],
+  "_note": "powerBudget is a design-facing relative combat-scale guide, NOT a stat. baseSuccess is modified by aura.tribulationSuccessBonus, pills, formations, and comprehension. Realms beyond ascension (Divine, Origin) are added later as data."
+}

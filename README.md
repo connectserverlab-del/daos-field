@@ -26,15 +26,32 @@ change — before a line of engine code is committed.
 - **Fair monetization enforced by the build** — cosmetic/convenience only, never rate/outcome/
   permanence for cash.
 
+## Building the game
+- [`tutorial/`](tutorial/) — **playable integrated tutorial region.** The full first-hour loop:
+  Dao Tree awakening (15 cards + aura, via `sim/`) → Village Elder → gather herbs → fight a spirit
+  beast → Alchemist pill → cultivate/breakthrough → first elemental technique. Reuses the 3D world,
+  combat sprites, and the tested cultivation engine; data-driven quests/NPCs; saves to localStorage.
+  Verified end-to-end in headless WebGL. See [`tutorial/README.md`](tutorial/README.md).
+- [`sim/`](sim/) — **the cultivation system, implemented.** A pure, data-driven, unit-tested
+  reference library (15 Heavenly Cards, Aura calculation, character stats, cultivation experience,
+  realm advancement). Reads `data/`, zero dependencies, 13 passing tests proving the design
+  invariants. Runs in the browser and is the spec for the UE5 GAS build. `cd sim && node test/run.js`.
+- [`engine/`](engine/) — **AAA native-engine handoff package (Unreal Engine 5).** Engine choice,
+  project scaffold, system-by-system mappings to engine constructs, character/combat/world pipelines,
+  data import, MMO networking, and all AI-generated art organized for import (`engine/art-refs/`).
+  This is the path to true AAA fidelity.
+- [`prototype/`](prototype/) — playable browser proof-of-concept of the **identity ceremony**
+  (race → 15 Heavenly Cards → aura reveal → Human World I), with photoreal portraits.
+- [`prototype3d/`](prototype3d/) — playable browser **3D open-world vertical slice** (WebGL/Three.js):
+  explorable valley, realistic sprite hero (run/attack), PBR terrain. A greybox reference for scale,
+  camera, and feel — not the foundation for the engine build.
+
 ## Repository layout
 ```
-docs/
-  00-vision-and-scope.md          vision, pillars, anti-goals, scope honesty
+docs/                             design bible: vision, critique, architecture, systems, roadmap
   01-design-review.md             the critique — exploits, risks, fixes (read first)
-  architecture/                   topology, event-sourced data model, netcode & sharding
-  systems/                        one doc per system, each covering the 10 technical dimensions
-  roadmap.md                      recommended implementation order
-data/
-  schema/                         JSON Schemas (CI-validated)
-  elements.json auras.json cultivation_realms.json worlds.json heavenly_fires.json
+data/                             engine-agnostic gameplay config + CI-validated JSON Schemas
+engine/                           Unreal Engine 5 handoff: docs/ + art-refs/ (start: engine/README.md)
+prototype/                        browser proof-of-concept — identity ceremony
+prototype3d/                      browser 3D open-world vertical slice (WebGL)
 ```

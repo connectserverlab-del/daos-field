@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "_comment": "Ordered tutorial quest chain. game.js drives a state machine over these; each advances on its trigger. Data-driven — add/reorder steps without touching code.",
+  "quests": [
+    { "id": "q1_awaken", "title": "Awakening Beneath the Dao Tree",
+      "objective": "Approach and touch the ancient Dao Tree.",
+      "trigger": { "type": "interact", "target": "dao_tree" } },
+    { "id": "q2_elder", "title": "The Elder's Counsel",
+      "objective": "Speak with the Village Elder about your awakening.",
+      "trigger": { "type": "talk", "target": "elder" } },
+    { "id": "q3_forest", "title": "First Steps Beyond the Village",
+      "objective": "Cross the bridge and enter the Whispering Forest.",
+      "trigger": { "type": "reach", "target": "forest" } },
+    { "id": "q4_herbs", "title": "Gather Spiritual Herbs",
+      "objective": "Collect 3 Spirit Herbs from the forest.",
+      "trigger": { "type": "gather", "target": "spirit_herb", "count": 3 } },
+    { "id": "q5_beast", "title": "Face a Spirit Beast",
+      "objective": "Defeat the Corrupted Spirit Beast prowling the forest.",
+      "trigger": { "type": "kill", "target": "spirit_beast", "count": 1 } },
+    { "id": "q6_alchemist", "title": "Return to the Alchemist",
+      "objective": "Bring the herbs to the Alchemist and receive a Foundation Pill.",
+      "trigger": { "type": "talk", "target": "alchemist" } },
+    { "id": "q7_cultivate", "title": "First Cultivation",
+      "objective": "Meditate at the Cultivation Stone and absorb the Foundation Pill.",
+      "trigger": { "type": "cultivate", "target": "meditation_stone" } },
+    { "id": "q8_technique", "title": "Elemental Awakening",
+      "objective": "Unlock and channel your first elemental technique (press Q).",
+      "trigger": { "type": "technique", "target": "any" } }
+  ]
+}

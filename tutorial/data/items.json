@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "_comment": "Data-driven item + technique definitions. A designer adds items/techniques here without touching gameplay code.",
+  "items": [
+    { "id": "spirit_herb", "name": "Spirit Herb", "type": "material", "icon": "🌿",
+      "desc": "A faintly glowing herb steeped in wild qi. Used in Foundation Pills." },
+    { "id": "foundation_pill", "name": "Foundation Pill", "type": "consumable", "icon": "◉",
+      "desc": "A mortal-grade cultivation pill. Absorb it during meditation to hasten your foundation.",
+      "cultivationBoost": 4000 },
+    { "id": "iron_sword", "name": "Iron Sword", "type": "weapon", "icon": "⚔", "grade": "mortal",
+      "desc": "A plain but honest blade. +Attack." },
+    { "id": "spirit_stone", "name": "Spirit Stone", "type": "currency", "icon": "◈",
+      "desc": "The common currency of cultivators." }
+  ],
+  "techniques": [
+    { "id": "flame_palm", "element": "fire", "name": "Scarlet Flame Palm",
+      "desc": "Loose a bursting palm of fire — heat, embers, and a scorching light.",
+      "color": "#e8623a", "key": "Q" },
+    { "id": "gale_step", "element": "wind", "name": "Gale-Rending Step",
+      "desc": "A cutting gust that scatters leaves and dust.", "color": "#9fe8c0", "key": "Q" },
+    { "id": "torrent_lash", "element": "water", "name": "Torrent Lash",
+      "desc": "A whip of conjured water, misting the air.", "color": "#43a6ef", "key": "Q" },
+    { "id": "stone_fist", "element": "earth", "name": "Mountain-Root Fist",
+      "desc": "A crushing strike carrying the weight of stone.", "color": "#c79a5b", "key": "Q" },
+    { "id": "verdant_lash", "element": "wood", "name": "Verdant Vine Lash",
+      "desc": "Living vines whip forth from your qi.", "color": "#54c07a", "key": "Q" },
+    { "id": "golden_edge", "element": "gold", "name": "Golden Edge", "default": true,
+      "desc": "A razor arc of sword-qi — the fallback Dao of the blade.",
+      "color": "#e8c53a", "key": "Q" },
+    { "id": "levin_arc", "element": "lightning", "name": "Levin Arc",
+      "desc": "A forking bolt of storm qi.", "color": "#b56ce8", "key": "Q" },
+    { "id": "radiant_ward", "element": "light", "name": "Radiant Ward",
+      "desc": "A pulse of healing light.", "color": "#f3ecc4", "key": "Q" },
+    { "id": "venom_touch", "element": "dark", "name": "Corrosive Touch",
+      "desc": "A creeping palm of poison qi.", "color": "#8a6ad0", "key": "Q" }
+  ]
+}
