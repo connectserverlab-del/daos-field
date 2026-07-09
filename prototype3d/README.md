@@ -29,8 +29,10 @@ ambient guqin score.
   banks, village and forest edges.
 - **C-drama atmosphere** — soft hazy sky, a layered misty-mountain backdrop panorama,
   cool volumetric fog and a cinematic colour-grade post pass (teal shadows / warm highs).
-- Unique **forest biomes** — pine, autumn broadleaf, birch, bamboo and sakura —
-  as instanced trees, plus scattered rocks.
+- Unique **forest biomes** built from **five photoreal 3D tree models** (Higgsfield
+  image→3D GLBs) — evergreen pine, broadleaf maple, emerald elm, and **two cherry
+  blossoms** (pink and white) — GPU-instanced with wind sway and per-tree colour
+  variance, plus a procedural bamboo grove and scattered rocks.
 - Bright midday sky, atmospheric fog, distant snow-capped mountains, animated
   reflective water, drifting motes, falling sakura petals, ground mist, bloom.
 - Cinematic third-person camera; three lore POIs (Spirit Vein, Stele, Cloud Shrine).

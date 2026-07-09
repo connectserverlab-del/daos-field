@@ -451,17 +451,19 @@ function forest(type, places){
 
 /* ---------------- forests + rocks ---------------- */
 var BIOMES=[
-  {type:"pine",   cx:-330, cz:-380, r:280, count:210, base:14, top:11},
-  {type:"pine",   cx: 520, cz: 300, r:230, count:150, base:12, top:10},
-  {type:"autumn", cx: 430, cz:-280, r:200, count:120, base:11, top:9},
-  {type:"bamboo", cx:-300, cz: 320, r:150, count:120, base:10, top:8},
-  {type:"birch",  cx:-560, cz: 70,  r:180, count:110, base:11, top:8},
-  {type:"sakura", cx: 210, cz:-200, r:150, count:90,  base:10, top:6},
-  {type:"sakura", cx: 340, cz: 150, r:120, count:60,  base:10, top:6}
+  {type:"pine",        cx:-330, cz:-380, r:280, count:210, base:14, top:11},
+  {type:"pine",        cx: 520, cz: 300, r:230, count:150, base:12, top:10},
+  {type:"maple",       cx: 430, cz:-280, r:200, count:120, base:11, top:9},
+  {type:"bamboo",      cx:-300, cz: 320, r:150, count:120, base:10, top:8},
+  {type:"elm",         cx:-560, cz: 70,  r:180, count:110, base:12, top:8},
+  {type:"cherry_pink", cx: 210, cz:-200, r:150, count:90,  base:9,  top:6},
+  {type:"cherry_white",cx: 340, cz: 150, r:120, count:60,  base:9,  top:6}
 ];
+/* placements for the 3D tree GLBs — filled here, consumed by loadTreeModels() */
+var TREE_PLACE={pine:[],maple:[],elm:[],cherry_pink:[],cherry_white:[]};
 function scatter(){
   trees=[];
-  var buckets={pine:[],autumn:[],birch:[],bamboo:[],sakura:[]};
+  var buckets={pine:[],maple:[],elm:[],bamboo:[],cherry_pink:[],cherry_white:[]};
   function ok(x,z,y){ return y>WATER_Y+1 && y<80 && Math.hypot(x-VILLAGE.x,z-VILLAGE.z)>VILLAGE.r*1.15
       && Math.hypot(x,z-10)>30 && onPath(x,z)<0.35 && Math.sqrt(x*x+z*z)<PLAY*1.05
       && !(city && city.near(x,z)); }   // keep the spawn clearing and water town open
@@ -475,14 +477,16 @@ function scatter(){
       buckets[bi.type].push({x:x,y:y,z:z,rot:hash2(i,bidx*13+7)*TAU,s:sc,seed:bidx*13+9});
     }
   });
-  // scattered lone trees across the whole valley (mostly pines — they read best low-poly)
+  // scattered lone trees across the whole valley
   for(var i=0;i<190;i++){
     var x=(hash2(i,71)-0.5)*2*PLAY, z=(hash2(i,33)-0.5)*2*PLAY, y=heightAt(x,z);
     if(!ok(x,z,y) || Math.hypot(x,z-10)>0 && Math.hypot(x,z-10)<48) continue;   // keep the spawn/bridge clearing open
-    var t=hash2(i,5)<0.86?"pine":"autumn";
+    var t=hash2(i,5)<0.72?"pine":(hash2(i,17)<0.6?"maple":"elm");
     buckets[t].push({x:x,y:y,z:z,rot:hash2(i,9)*TAU,s:8+hash2(i,4)*6,seed:44});
   }
-  Object.keys(buckets).forEach(function(k){ forest(k, buckets[k]); });
+  forest("bamboo", buckets.bamboo);                 // bamboo stays procedural (distinct, reads well)
+  TREE_PLACE={pine:buckets.pine, maple:buckets.maple, elm:buckets.elm,
+              cherry_pink:buckets.cherry_pink, cherry_white:buckets.cherry_white};
 
   // rocks scattered around the valley
   var rockMat=new THREE.MeshStandardMaterial({map:tex.rock||null,color:0x9a948a,roughness:1,flatShading:true});
@@ -506,6 +510,7 @@ function loadModels(){
   loadHeroModel();
   loadBuildings();
   loadWorldProps();
+  loadTreeModels();
 }
 /* --- hero: load per-animation GLBs that share the Meshy skeleton, drive one mixer --- */
 function loadHeroModel(){
@@ -631,6 +636,56 @@ function loadProp(file, opts, anchors){
     });
     if(opts.onLoad) opts.onLoad();
   }, undefined, function(){ /* missing GLB → skip (procedural fallbacks remain) */ });
+}
+/* ---------------- 3D forest: real Higgsfield tree GLBs, instanced ---------------- */
+var TREE_DEFS={
+  pine:         {file:"tree_pine.glb",         sway:0.045},
+  maple:        {file:"tree_maple.glb",        sway:0.075},
+  elm:          {file:"tree_elm.glb",          sway:0.075},
+  cherry_pink:  {file:"tree_cherry_pink.glb",  sway:0.075},
+  cherry_white: {file:"tree_cherry_white.glb", sway:0.075}
+};
+/* if a GLB is missing, fall back to the old procedural species so trees never vanish */
+function fallbackType(k){ return k==="pine"?"pine":(k==="cherry_pink"||k==="cherry_white")?"sakura":(k==="elm")?"birch":"autumn"; }
+/* collapse a loaded tree GLB into one geometry + material, normalized to unit height,
+   centred on X/Z with its base sitting on y=0 (so an instance drops onto the ground). */
+function buildUnitTree(gltf){
+  var geos=[], mat=null; gltf.scene.updateWorldMatrix(true,true);
+  gltf.scene.traverse(function(o){ if(o.isMesh && o.geometry){
+    var g=o.geometry.clone(); g.applyMatrix4(o.matrixWorld); geos.push(g); if(!mat) mat=o.material; }});
+  if(!geos.length||!mat) return null;
+  var geo = geos.length>1 ? mergeGeos(geos) : geos[0];
+  geo.computeBoundingBox(); var bb=geo.boundingBox, sz=new THREE.Vector3(); bb.getSize(sz);
+  geo.translate(-(bb.min.x+sz.x*0.5), -bb.min.y, -(bb.min.z+sz.z*0.5));   // base→0, centre XZ
+  var f=1/(sz.y||1); geo.scale(f,f,f);                                    // height→1
+  geo.computeVertexNormals();
+  var m=mat.clone(); m.side=THREE.DoubleSide; m.roughness=1; m.metalness=0;
+  if(m.map) m.map.encoding=THREE.sRGBEncoding;
+  return {geo:geo, mat:m};
+}
+function instanceTree(geo, mat, places, def){
+  windify(mat, def.sway||0.06);
+  var inst=new THREE.InstancedMesh(geo, mat, places.length);
+  inst.castShadow=true; inst.receiveShadow=false; inst.frustumCulled=false;
+  var d=new THREE.Object3D(), col=new THREE.Color();
+  for(var i=0;i<places.length;i++){ var p=places[i];
+    d.position.set(p.x,p.y,p.z); d.rotation.set(0,p.rot,0); d.scale.setScalar(p.s); d.updateMatrix();
+    inst.setMatrixAt(i,d.matrix);
+    var b=0.82+hash2(i,7)*0.24; col.setRGB(b,b,b); inst.setColorAt(i,col);   // subtle per-tree lighting variance
+  }
+  if(inst.instanceColor) inst.instanceColor.needsUpdate=true;
+  scene.add(inst);
+}
+function loadTreeModels(){
+  if(!GLTF){ Object.keys(TREE_PLACE).forEach(function(k){ if(TREE_PLACE[k].length) forest(fallbackType(k),TREE_PLACE[k]); }); return; }
+  Object.keys(TREE_DEFS).forEach(function(k){
+    var def=TREE_DEFS[k], places=TREE_PLACE[k]||[]; if(!places.length) return;
+    GLTF.load(MODELS_BASE+def.file, function(gltf){
+      var built=buildUnitTree(gltf);
+      if(built) instanceTree(built.geo, built.mat, places, def);
+      else forest(fallbackType(k), places);
+    }, undefined, function(){ forest(fallbackType(k), places); });   // missing GLB → procedural species
+  });
 }
 function loadWorldProps(){
   if(!GLTF) return;
