@@ -69,6 +69,41 @@
   #load{margin-top:1.3em;color:#9c927e;letter-spacing:.2em;font-size:12px;text-transform:uppercase}
   #foot{position:fixed;bottom:6px;left:0;right:0;z-index:20;text-align:center;color:#8a8172;
     font-size:11px;letter-spacing:.08em;opacity:.6}
+  /* granted-element HUD chips */
+  #granted{position:fixed;left:12px;bottom:calc(8vh + 20px);z-index:7;display:flex;flex-direction:column;
+    gap:6px;pointer-events:none}
+  #granted .gchip{display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:.12em;
+    text-transform:uppercase;color:#efe6d2;background:rgba(6,10,14,.5);border:1px solid rgba(199,154,91,.5);
+    border-radius:2px;padding:3px 9px;text-shadow:0 1px 6px #000}
+  #granted .gchip .gd{width:.7em;height:.7em;border-radius:50%;box-shadow:0 0 9px currentColor}
+  /* developer panel */
+  #devBtn{top:calc(8vh + 50px);right:12px}
+  #devPanel{position:fixed;top:calc(8vh + 10px);left:12px;z-index:12;width:min(340px,90vw);
+    max-height:78vh;overflow-y:auto;background:linear-gradient(180deg,rgba(9,13,18,.94),rgba(9,13,18,.88));
+    border:1px solid var(--bronze);border-radius:5px;padding:12px 13px;display:none;
+    box-shadow:0 12px 50px rgba(0,0,0,.6);backdrop-filter:blur(4px);font-family:var(--serif);pointer-events:auto}
+  #devPanel.open{display:block}
+  #devPanel .dp-head{display:flex;justify-content:space-between;align-items:center;letter-spacing:.22em;
+    text-transform:uppercase;font-size:11px;color:var(--amber);margin-bottom:10px}
+  #devPanel .dp-head #dpClose{cursor:pointer;color:#c9bfa6;font-size:14px}
+  #devPanel .dp-sec{letter-spacing:.2em;text-transform:uppercase;font-size:10px;color:var(--bronze);
+    margin:12px 0 6px;border-top:1px solid rgba(199,154,91,.2);padding-top:9px}
+  #devPanel .dp-rar{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#7f8c93;margin:8px 0 4px}
+  #dpElements{display:flex;flex-wrap:wrap;gap:6px}
+  .el{cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;color:#d8cfba;
+    border:1px solid rgba(199,154,91,.3);border-radius:2px;padding:4px 8px;transition:.15s;user-select:none}
+  .el .ed{width:.72em;height:.72em;border-radius:50%;box-shadow:0 0 8px currentColor}
+  .el:hover{border-color:var(--amber)}
+  .el.on{background:rgba(232,184,74,.16);border-color:var(--amber);color:#fff}
+  .el.att{outline:1px solid var(--amber);outline-offset:1px}
+  #devPanel .dp-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
+  #devPanel button.dbtn,#devPanel .tp{cursor:pointer;font-family:var(--serif);font-size:12px;letter-spacing:.06em;
+    color:#efe6d2;background:linear-gradient(180deg,rgba(199,154,91,.16),rgba(199,154,91,.04));
+    border:1px solid var(--bronze);border-radius:2px;padding:5px 10px}
+  #devPanel button.dbtn:hover,#devPanel .tp:hover{border-color:var(--amber)}
+  #devPanel label{font-size:11px;letter-spacing:.08em;color:#c9bfa6;display:flex;align-items:center;gap:7px;width:100%}
+  #devPanel input[type=range]{flex:1;accent-color:var(--amber)}
+  #devPanel .dp-note{font-size:10px;color:#7f8c93;margin-top:10px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -79,8 +114,31 @@
 <div id="cine"><div class="bar top"></div><div class="bar bottom"></div><div class="vig"></div></div>
 <div id="grain"></div>
 <div id="dev"></div>
+<div id="granted"></div>
 <div class="stick" id="stickL"><div class="nub"></div></div>
 <button class="ui-btn" id="audioBtn">♪ Music</button>
+<button class="ui-btn" id="devBtn">⚙ DEV</button>
+
+<div id="devPanel">
+  <div class="dp-head"><span>Developer · Grant Elements</span><span id="dpClose">✕</span></div>
+  <div id="dpElements"></div>
+  <div class="dp-row" style="margin-top:8px">
+    <button class="dbtn" id="dpAll">Grant all</button>
+    <button class="dbtn" id="dpClear">Clear</button>
+  </div>
+  <div class="dp-sec">Teleport</div>
+  <div class="dp-row" id="dpTeleport"></div>
+  <div class="dp-sec">World toggles</div>
+  <div class="dp-row"><label>Move speed <input type="range" id="dpSpeed" min="0.5" max="4" step="0.1" value="1"></label></div>
+  <div class="dp-row"><label>Daylight <input type="range" id="dpDay" min="0" max="1" step="0.01" value="0.82"></label></div>
+  <div class="dp-row">
+    <button class="dbtn" id="dpFly">Fly: off</button>
+    <button class="dbtn" id="dpFace">Flip hero facing</button>
+    <button class="dbtn" id="dpFps">FPS: off</button>
+  </div>
+  <div class="dp-note">Attuned element (click a granted chip a 2nd time) tints your aura and is
+    channelled from the hero's hand on attack (click / Space). Toggle this panel with the DEV button or the <b>`</b> key.</div>
+</div>
 
 <div id="veil">
   <div class="kick" id="vkick"></div>
@@ -94,6 +152,7 @@
 <div id="foot"></div>
 
 <script src="./vendor/three.min.js"></script>
+<script src="./vendor/loaders/GLTFLoader.js"></script>
 <script src="./vendor/shaders/CopyShader.js"></script>
 <script src="./vendor/shaders/LuminosityHighPassShader.js"></script>
 <script src="./vendor/shaders/FXAAShader.js"></script>
@@ -103,6 +162,7 @@
 <script src="./vendor/postprocessing/MaskPass.js"></script>
 <script src="./vendor/postprocessing/UnrealBloomPass.js"></script>
 <script src="./strings.js"></script>
+<script src="./elements.js"></script>
 <script src="./game.js"></script>
 </body>
 </html>
