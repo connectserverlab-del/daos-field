@@ -1,0 +1,37 @@
+name: Deploy playable slice to GitHub Pages
+
+# Publishes the explorable 3D vertical slice (prototype3d/) as the site root, so the
+# game is playable at https://<owner>.github.io/daos-field/ after each push to main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; newer pushes cancel in-progress runs.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload prototype3d as the site root
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: prototype3d
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
