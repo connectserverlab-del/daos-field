@@ -21,12 +21,15 @@ function vnoise(x,z){ const xi=Math.floor(x),zi=Math.floor(z),xf=x-xi,zf=z-zi;
 function fbm(x,z){ let t=0,a=0.5,f=1; for(let i=0;i<4;i++){t+=a*vnoise(x*f,z*f);f*=2;a*=0.5;} return t; }
 const WATER_Y=-1.3;
 function riverZ(x){ return -30 + Math.sin(x*0.02)*8; }
+const POND={x:-34,z:24,r:44,depth:7.0};
 function heightAt(x,z){
   let n = fbm(x*0.012+5, z*0.012+2)*5.5 + fbm(x*0.045,z*0.045)*1.4;
   // mountain walls on all four sides bound a larger playable bowl (~330×330 inside the 400 plane)
   n += Math.pow(Math.max(0,(Math.abs(x)-165))/34,2)*12;
   n += Math.pow(Math.max(0,(Math.abs(z)-165))/34,2)*12;
-  n -= Math.exp(-Math.pow(z-riverZ(x),2)/(2*9*9))*3.8;         // river channel
+  n -= Math.exp(-Math.pow(z-riverZ(x),2)/(2*9*9))*4.6;         // river channel (deepened)
+  // village pond — a broad basin that fills well below the waterline (the reference's pond)
+  const pd=Math.hypot(x-POND.x,z-POND.z); n -= Math.exp(-pd*pd/(2*POND.r*0.62*POND.r*0.62))*POND.depth;
   const md=Math.hypot(x+95,z+95); n += Math.max(0,(55-md))*0.5; // NW mountain
   const md2=Math.hypot(x-140,z-120); n += Math.max(0,(46-md2))*0.42; // SE ridge (far forest backdrop)
   return n;
@@ -46,21 +49,50 @@ function makeRenderer(){
   renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
 }
+let skyMat;
 function makeSky(){
-  const uni={top:{value:new THREE.Color(0x2b4a5a)},mid:{value:new THREE.Color(0x9fb8bd)},bot:{value:new THREE.Color(0xe4cfa6)},sun:{value:SUN_DIR.clone()}};
-  const mat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:uni,
+  // Atmospheric sky: zenith→horizon gradient, physically-ish sun disk + Mie halo, and
+  // scrolling fbm cloud layers near the horizon. Fog is tinted to the horizon so distant
+  // hills melt into haze like the reference shot.
+  skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{
+      zenith:{value:new THREE.Color(0x2a5a8c)}, horizon:{value:new THREE.Color(0xd8e6ec)},
+      ground:{value:new THREE.Color(0xbcc9c4)}, sunCol:{value:new THREE.Color(0xfff2d8)},
+      sun:{value:SUN_DIR.clone()}, t:{value:0} },
     vertexShader:"varying vec3 vD;void main(){vD=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
-    fragmentShader:"varying vec3 vD;uniform vec3 top;uniform vec3 mid;uniform vec3 bot;uniform vec3 sun;void main(){float h=clamp(vD.y*0.5+0.5,0.0,1.0);vec3 c=mix(bot,mid,smoothstep(0.32,0.5,h));c=mix(c,top,smoothstep(0.5,0.9,h));float s=pow(max(dot(normalize(vD),normalize(sun)),0.0),8.0);c+=vec3(1.0,0.85,0.6)*s*0.6;gl_FragColor=vec4(c,1.0);}"});
-  scene.add(new THREE.Mesh(new THREE.SphereGeometry(900,32,16),mat));
-  if(tex.sky){ tex.sky.wrapS=THREE.RepeatWrapping; tex.sky.encoding=THREE.sRGBEncoding;
-    const band=new THREE.Mesh(new THREE.CylinderGeometry(850,850,520,64,1,true),new THREE.MeshBasicMaterial({map:tex.sky,side:THREE.BackSide,fog:false,depthWrite:false,transparent:true,opacity:0.96}));
-    band.position.y=70; scene.add(band); }
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:radialTex("rgba(255,244,214,1)","rgba(255,220,150,0)"),blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false}));
-  sp.scale.set(180,180,1); sp.position.copy(SUN_DIR.clone().multiplyScalar(800)); scene.add(sp);
+    fragmentShader:`varying vec3 vD;uniform vec3 zenith;uniform vec3 horizon;uniform vec3 ground;uniform vec3 sunCol;uniform vec3 sun;uniform float t;
+      float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+      float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));
+        return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);}
+      float fbm(vec2 p){float s=0.0,a=0.5;for(int i=0;i<5;i++){s+=a*noise(p);p*=2.02;a*=0.5;}return s;}
+      void main(){
+        vec3 d=normalize(vD); float h=d.y;
+        // base gradient
+        vec3 col=mix(horizon,zenith,pow(clamp(h,0.0,1.0),0.55));
+        col=mix(col,ground,smoothstep(0.0,-0.15,h));
+        float sd=max(dot(d,normalize(sun)),0.0);
+        // sun disk + halo
+        col+=sunCol*pow(sd,2200.0)*1.4;               // disk
+        col+=sunCol*pow(sd,10.0)*0.35;                // inner halo
+        col+=sunCol*pow(sd,3.0)*0.12;                 // wide glow
+        // clouds: project onto a plane above, scroll with time; concentrate near horizon
+        if(h>0.02){
+          vec2 uv=d.xz/(h+0.18)*1.6+vec2(t*0.006,t*0.002);
+          float cl=fbm(uv);
+          cl=smoothstep(0.55,0.95,cl)*smoothstep(0.9,0.18,h); // fade out toward zenith
+          vec3 cloudCol=mix(vec3(0.72,0.78,0.82),sunCol,sd*0.5);
+          col=mix(col,cloudCol,cl*0.85);
+        }
+        gl_FragColor=vec4(col,1.0);
+      }`});
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(900,48,24),skyMat));
+  // crisp sun sprite core for bloom to catch
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:radialTex("rgba(255,248,228,1)","rgba(255,226,160,0)"),blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false}));
+  sp.scale.set(120,120,1); sp.position.copy(SUN_DIR.clone().multiplyScalar(800)); scene.add(sp);
 }
 function makeLights(){
-  scene.add(new THREE.HemisphereLight(0xcfe0e8,0x46402f,0.72));
-  sun=new THREE.DirectionalLight(0xffe4bd,1.7); sun.position.copy(SUN_DIR.clone().multiplyScalar(120)); sun.castShadow=true;
+  scene.add(new THREE.HemisphereLight(0xdcecf2,0x4a4636,0.85));
+  sun=new THREE.DirectionalLight(0xfff0d6,2.05); sun.position.copy(SUN_DIR.clone().multiplyScalar(120)); sun.castShadow=true;
   sun.shadow.mapSize.set(2048,2048); const sc=sun.shadow.camera; sc.near=1;sc.far=380;sc.left=sc.bottom=-90;sc.right=sc.top=90; sun.shadow.bias=-0.0004;
   scene.add(sun); scene.add(sun.target); scene.add(new THREE.AmbientLight(0x2c3a44,0.28));
 }
@@ -78,10 +110,102 @@ function makeTerrain(){
       "#ifdef USE_MAP\n vec3 gc=texture2D(map,vUv).rgb;vec3 dc=texture2D(tDirt,vUv).rgb;float st=1.0-smoothstep(0.72,0.9,vUp);diffuseColor.rgb*=mix(gc,dc,st);\n#endif\n"); };
   m.customProgramCacheKey=()=>"tutTerrain";
   const mesh=new THREE.Mesh(geo,m); mesh.receiveShadow=true; scene.add(mesh);
-  waterMat=new THREE.ShaderMaterial({transparent:true,uniforms:{t:{value:0}},
-    vertexShader:"varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
-    fragmentShader:"varying vec3 vP;uniform float t;void main(){float r=sin(vP.x*0.4+t)*0.5+cos(vP.y*0.5-t*1.2)*0.5;float f=smoothstep(-1.0,1.0,r);vec3 c=mix(vec3(0.09,0.2,0.23),vec3(0.7,0.82,0.86),0.3+f*0.4);c+=vec3(1.0,0.95,0.8)*pow(max(f,0.0),6.0)*0.35;gl_FragColor=vec4(c,0.85);}"});
-  const w=new THREE.Mesh(new THREE.PlaneGeometry(400,400,1,1),waterMat); w.rotation.x=-Math.PI/2; w.position.y=WATER_Y; scene.add(w);
+  makeWater();
+}
+
+/* ---------- reflective water (planar reflection + waves + fresnel + foam) ---------- */
+let water;
+function buildDepthTex(){
+  // bake shore depth over the map so the shader can discard water over land, tint by depth,
+  // and draw shoreline foam — cheap (one CPU pass at load) and reads as real water edges.
+  const N=192, d=new Uint8Array(N*N*4);
+  for(let j=0;j<N;j++) for(let i=0;i<N;i++){
+    const x=(i/(N-1))*400-200, z=(j/(N-1))*400-200;
+    const above=heightAt(x,z)-WATER_Y;              // >0 land, <0 underwater
+    const v=Math.round(clamp(above*0.2+0.5,0,1)*255); // 0.5 = waterline
+    const k=(j*N+i)*4; d[k]=v; d[k+1]=v; d[k+2]=v; d[k+3]=255;
+  }
+  const tx=new THREE.DataTexture(d,N,N,THREE.RGBAFormat); tx.minFilter=THREE.LinearFilter; tx.magFilter=THREE.LinearFilter; tx.needsUpdate=true;
+  return tx;
+}
+function makeWater(){
+  const depthTex=buildDepthTex();
+  const shader={
+    uniforms:{ color:{value:new THREE.Color(0xffffff)}, tDiffuse:{value:null}, textureMatrix:{value:new THREE.Matrix4()},
+      time:{value:0}, sunDir:{value:SUN_DIR.clone()}, camPos:{value:new THREE.Vector3()},
+      deepCol:{value:new THREE.Color(0x0a2028)}, shallowCol:{value:new THREE.Color(0x246b70)},
+      skyCol:{value:new THREE.Color(0xaecdd8)}, tDepth:{value:depthTex} },
+    vertexShader:`uniform mat4 textureMatrix;varying vec4 vUv;varying vec3 vW;
+      void main(){ vec4 wp=modelMatrix*vec4(position,1.0); vW=wp.xyz; vUv=textureMatrix*vec4(position,1.0);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader:`uniform vec3 color;uniform sampler2D tDiffuse;uniform sampler2D tDepth;uniform float time;
+      uniform vec3 sunDir;uniform vec3 camPos;uniform vec3 deepCol;uniform vec3 shallowCol;uniform vec3 skyCol;
+      varying vec4 vUv;varying vec3 vW;
+      // sum of directional waves -> surface gradient (for normal) at world xz
+      vec2 waveGrad(vec2 p){
+        vec2 g=vec2(0.0);
+        // (amp, freq, speed, dirx, diry)
+        const int N=5;
+        vec2 dirs[5]; float amps[5]; float freqs[5]; float sps[5];
+        dirs[0]=vec2(1.0,0.2);amps[0]=0.055;freqs[0]=0.55;sps[0]=1.1;
+        dirs[1]=vec2(-0.3,1.0);amps[1]=0.04;freqs[1]=0.8;sps[1]=1.4;
+        dirs[2]=vec2(0.7,-0.7);amps[2]=0.03;freqs[2]=1.3;sps[2]=1.8;
+        dirs[3]=vec2(-0.9,-0.4);amps[3]=0.02;freqs[3]=2.1;sps[3]=2.3;
+        dirs[4]=vec2(0.2,1.0);amps[4]=0.014;freqs[4]=3.3;sps[4]=2.9;
+        for(int i=0;i<N;i++){ vec2 dd=normalize(dirs[i]); float ph=dot(dd,p)*freqs[i]+time*sps[i];
+          float c=cos(ph)*amps[i]*freqs[i]; g+=dd*c; }
+        return g;
+      }
+      void main(){
+        vec2 duv=(vW.xz+200.0)/400.0;
+        float above=(texture2D(tDepth,duv).r-0.5)*5.0;   // >0 land
+        if(above>0.04) discard;                           // no water over land
+        float depth=max(0.0,-above);
+        vec2 g=waveGrad(vW.xz);
+        vec3 N=normalize(vec3(-g.x,1.0,-g.y));
+        vec3 V=normalize(camPos-vW);
+        // fresnel capped so the water body colour always shows through (never a pure white mirror)
+        float fres=clamp(0.06+0.72*pow(1.0-max(dot(N,V),0.0),4.0),0.0,0.82);
+        // reflection (distorted by wave normal), slightly darkened so it reads as water not chrome
+        vec2 dist=N.xz*0.05;
+        vec4 refl=texture2DProj(tDiffuse,vUv+vec4(dist,0.0,0.0));
+        vec3 reflC=mix(skyCol,refl.rgb,0.82)*0.92;
+        // deep, saturated water body colour by depth
+        vec3 body=mix(shallowCol,deepCol,clamp(depth*0.42,0.0,1.0));
+        vec3 col=mix(body,reflC,fres);
+        // sun specular glitter (tight, warm)
+        vec3 H=normalize(V+normalize(sunDir));
+        col+=vec3(1.0,0.95,0.82)*pow(max(dot(N,H),0.0),260.0)*1.3;
+        // shoreline foam — a thin lapping band right at the edge + faint crest sparkle
+        float crest=smoothstep(0.03,0.11,length(g));
+        float foam=smoothstep(0.32,0.03,depth)*0.6 + crest*smoothstep(0.7,0.0,depth)*0.22;
+        col=mix(col,vec3(0.88,0.93,0.95),clamp(foam,0.0,0.7));
+        float alpha=mix(0.80,0.98,clamp(depth*0.9,0.0,1.0));
+        alpha=max(alpha,foam*0.9);
+        gl_FragColor=vec4(col,alpha);
+      }`
+  };
+  const geo=new THREE.PlaneGeometry(400,400,1,1);
+  water=new THREE.Reflector(geo,{textureWidth:1024,textureHeight:1024,clipBias:0.0028,shader});
+  water.rotation.x=-Math.PI/2; water.position.y=WATER_Y; water.matrixAutoUpdate=true; water.updateMatrixWorld();
+  water.material.transparent=true; water.material.depthWrite=false;
+  scene.add(water);
+  waterMat=water.material;
+}
+function makeLilyPads(){
+  const padMat=new THREE.MeshStandardMaterial({color:0x3f7d43,roughness:0.72,metalness:0,side:THREE.DoubleSide});
+  const flowerMat=new THREE.MeshStandardMaterial({color:0xf4c8da,roughness:0.6,emissive:0x3a1020,emissiveIntensity:0.12});
+  let made=0;
+  for(let i=0;i<80 && made<34;i++){
+    const a=hash2(i,71)*TAU, rr=Math.sqrt(hash2(i,53))*POND.r*0.92;
+    const x=POND.x+Math.cos(a)*rr, z=POND.z+Math.sin(a)*rr;
+    if(heightAt(x,z) > WATER_Y-0.35) continue;              // only float on real water
+    const s=0.8+hash2(i,7)*1.3;
+    const pad=new THREE.Mesh(new THREE.CircleGeometry(s,12), padMat);
+    pad.rotation.x=-Math.PI/2; pad.rotation.z=hash2(i,4)*TAU; pad.position.set(x,WATER_Y+0.05,z); pad.receiveShadow=true; scene.add(pad);
+    if(hash2(i,9)>0.66){ const fl=new THREE.Mesh(new THREE.ConeGeometry(0.2,0.45,7),flowerMat); fl.position.set(x+0.2,WATER_Y+0.24,z); scene.add(fl); }
+    made++;
+  }
 }
 
 /* ---------- GLB props ---------- */
@@ -90,9 +214,18 @@ const src={};
 function normalize(o,targetH){ o.updateMatrixWorld(true); let box=new THREE.Box3().setFromObject(o),sz=new THREE.Vector3();box.getSize(sz);
   const s=targetH/(sz.y||1);o.scale.setScalar(s);o.updateMatrixWorld(true);
   const b2=new THREE.Box3().setFromObject(o),c=new THREE.Vector3();b2.getCenter(c);o.position.x-=c.x;o.position.z-=c.z;o.position.y-=b2.min.y;return o; }
-function place(key,x,z,h,rotY,yOff){ if(!src[key])return null; const o=src[key].clone(true); normalize(o,h);
+function place(key,x,z,h,rotY,yOff,solid){ if(!src[key])return null; const o=src[key].clone(true); normalize(o,h);
   const g=new THREE.Group(); g.add(o); g.position.set(x,heightAt(x,z)-0.3+(yOff||0),z); g.rotation.y=rotY||0;
-  g.traverse(n=>{ if(n.isMesh){n.castShadow=true;n.receiveShadow=true; if(n.material)n.material.metalness=0;} }); scene.add(g); return g; }
+  g.traverse(n=>{ if(n.isMesh){n.castShadow=true;n.receiveShadow=true; if(n.material)n.material.metalness=0;} }); scene.add(g);
+  if(solid){ g.updateMatrixWorld(true); const bb=new THREE.Box3().setFromObject(g),sz=new THREE.Vector3(); bb.getSize(sz);
+    addCollider(x,z,Math.max(sz.x,sz.z)*0.5*(typeof solid==="number"?solid:0.55)); }
+  return g; }
+/* ---------- collision (solid props / NPCs / trees) ---------- */
+const colliders=[];
+function addCollider(x,z,r){ colliders.push({x,z,r}); }
+function resolveColliders(p){ const pr=0.55;
+  for(let k=0;k<colliders.length;k++){ const c=colliders[k]; const dx=p.x-c.x, dz=p.z-c.z; const min=c.r+pr;
+    const d2=dx*dx+dz*dz; if(d2<min*min){ if(d2<1e-6){ p.x+=min; continue; } const d=Math.sqrt(d2); const push=(min-d)/d; p.x+=dx*push; p.z+=dz*push; } } }
 function loadModels(){ return new Promise((res)=>{ const loader=new THREE.GLTFLoader(); let n=Object.keys(MODELS).length;
   Object.keys(MODELS).forEach(k=>loader.load(MODELS[k],g=>{src[k]=g.scene;if(--n===0)res();},undefined,()=>{if(--n===0)res();})); }); }
 
@@ -122,7 +255,7 @@ const G = {
 let QUESTS, NPCS_D, ITEMS, TECHS, qiData, qiEngine;
 
 /* ---------- player ---------- */
-const player = { pos:new THREE.Vector3(0,0,20), yaw:Math.PI, sprite:null, speed:0, vel:new THREE.Vector3(), attacking:false, at:0, hurtFlash:0 };
+const player = { pos:new THREE.Vector3(26,0,6), yaw:Math.PI, sprite:null, speed:0, vel:new THREE.Vector3(), attacking:false, at:0, hurtFlash:0 };
 let heroFrames={run:[],attack:[],idle:[]};
 function makePlayer(){
   player.sprite=billboard(null,5.4); player.sprite.set(heroFrames.idle[0]||heroFrames.run[0]);
@@ -146,6 +279,7 @@ function buildWorld2(){
   // Dao Tree — the reused tree.glb, scaled monumental, central
   daoTree = place("tree", 0, -8, 42, 0.3);
   if(daoTree){ daoTree.traverse(n=>{ if(n.isMesh&&n.material){ n.material=n.material.clone(); } }); }
+  addCollider(0,-8,2.6);  // Dao Tree trunk is solid (canopy stays walk-under)
   // faint aura motes around the tree
   const tg=new THREE.BufferGeometry(); const N=260,arr=new Float32Array(N*3);
   for(let i=0;i<N;i++){ const a=Math.random()*TAU,r=6+Math.random()*10; arr[i*3]=Math.cos(a)*r; arr[i*3+1]=2+Math.random()*30; arr[i*3+2]=-8+Math.sin(a)*r; }
@@ -157,13 +291,13 @@ function buildWorld2(){
 
   // Village houses (south) + NPCs
   const hpos=[[16,50,0.3],[30,58,1.2],[-12,58,2.3],[38,46,4.6],[6,72,5.1]];
-  for(const h of hpos) place("house",h[0],h[1],6,h[2]);
-  // Bridge over the river (north path)
+  for(const h of hpos) place("house",h[0],h[1],6,h[2],0,0.5);  // houses are solid
+  // Bridge over the river (north path) — walkable, no collider
   place("bridge",0,riverZ(0),4.5,Math.PI/2,WATER_Y+0.2+0.3);
-  // Mountain + cave (NW) — landmark + future content
-  place("mountain",-95,-95,44,0.4); place("mountain",-120,-72,28,1.3);
-  place("mountain",150,140,40,0.7); place("mountain",128,168,26,2.1); // SE massif
-  place("cave",-86,-64,8,0.2); place("cave",150,120,8,1.6);            // second cave (SE)
+  // Mountain + cave (NW) — landmark + future content (mountains bounded by terrain)
+  place("mountain",-95,-95,44,0.4,-12); place("mountain",-120,-72,28,1.3,-8);
+  place("mountain",150,140,40,0.7,-12); place("mountain",128,168,26,2.1,-8); // SE massif (sunk to sit in terrain)
+  place("cave",-86,-64,8,0.2,0,0.5); place("cave",150,120,8,1.6,0,0.5); // caves solid
   // Forests — several clusters spread across the enlarged map so the world feels lived-in.
   // Each cluster: a centre, a radius, a count, and a size range. Data-driven so more can be added.
   const FORESTS=[
@@ -183,18 +317,18 @@ function buildWorld2(){
       if(Math.abs(z-riverZ(x))<10) continue;                 // keep the river clear
       if(heightAt(x,z)<WATER_Y+0.5) continue;                // no trees in water
       if(Math.hypot(x,z-(-8))<20) continue;                  // clearing around the Dao Tree
-      place("tree",x,z,F.h[0]+hash2(seedi,3)*(F.h[1]-F.h[0]),hash2(seedi,7)*TAU); placed++;
+      place("tree",x,z,F.h[0]+hash2(seedi,3)*(F.h[1]-F.h[0]),hash2(seedi,7)*TAU); addCollider(x,z,0.8); placed++;
     }
   }
   // standing stones / rock clusters as landmarks in the clearings
   for(let i=0;i<10;i++){ const x=(hash2(i+80,5)-0.5)*320, z=(hash2(i+80,9)-0.5)*320;
     if(Math.abs(x)>180||Math.abs(z)>180||heightAt(x,z)<WATER_Y+1||Math.hypot(x,z-(-8))<24) continue;
     const rk=new THREE.Mesh(new THREE.DodecahedronGeometry(1+hash2(i+80,3)*2,0),new THREE.MeshStandardMaterial({map:tex.rock||null,color:0x8a857a,roughness:1,flatShading:true}));
-    rk.position.set(x,heightAt(x,z)+0.6,z); rk.rotation.set(hash2(i,1)*TAU,hash2(i,2)*TAU,hash2(i,4)*TAU); rk.castShadow=true; rk.receiveShadow=true; scene.add(rk);
+    const rr=1+hash2(i+80,3)*2; rk.position.set(x,heightAt(x,z)+0.6,z); rk.rotation.set(hash2(i,1)*TAU,hash2(i,2)*TAU,hash2(i,4)*TAU); rk.castShadow=true; rk.receiveShadow=true; scene.add(rk); addCollider(x,z,rr*0.7);
   }
   // Meditation Stone — near the Dao Tree
   meditationStone=new THREE.Mesh(new THREE.DodecahedronGeometry(1.6,0),new THREE.MeshStandardMaterial({map:tex.rock||null,color:0x8f8a80,roughness:1,flatShading:true}));
-  meditationStone.position.set(22,heightAt(22,-4)+1.0,-4); meditationStone.castShadow=true; scene.add(meditationStone);
+  meditationStone.position.set(22,heightAt(22,-4)+1.0,-4); meditationStone.castShadow=true; scene.add(meditationStone); addCollider(22,-4,1.7);
   addInteractable({ id:"meditation_stone", pos:new THREE.Vector3(22,0,-4), radius:4, prompt:"Meditate & Cultivate", enabled:true, onInteract:startMeditation });
 
   // Herb nodes (forest)
@@ -206,6 +340,7 @@ function buildWorld2(){
       onInteract:()=>gatherHerb(node) });
     herbNodes.push(node);
   }
+  makeLilyPads();
   // Spirit beasts — the tutorial beast (blocks Q5) plus a roaming pack spread across the forests.
   // Data-driven list; tier scales hp/damage/reward so the world stays fightable, not just one duel.
   beast = spawnBeast({ x:20, z:-78, hp:60, dmg:7, tutorial:true, name:"Corrupted Spirit Beast" });
@@ -221,6 +356,23 @@ function buildWorld2(){
   for(const npc of NPCS_D.npcs) makeNPC(npc);
 }
 let daoMotes;
+/* ---------- drifting sakura petals (ambience toward the reference) ---------- */
+let petals;
+function makePetals(){
+  const N=520, g=new THREE.BufferGeometry(), a=new Float32Array(N*3), ph=new Float32Array(N), vy=new Float32Array(N);
+  for(let i=0;i<N;i++){ a[i*3]=(Math.random()-0.5)*220; a[i*3+1]=Math.random()*46; a[i*3+2]=(Math.random()-0.5)*220; ph[i]=Math.random()*TAU; vy[i]=1.1+Math.random()*1.4; }
+  g.setAttribute("position",new THREE.BufferAttribute(a,3));
+  const mat=new THREE.PointsMaterial({map:radialTex("rgba(255,214,228,1)","rgba(255,183,208,0)"),color:0xffd3e0,size:0.55,transparent:true,opacity:0.9,depthWrite:false,fog:true});
+  petals={pts:new THREE.Points(g,mat),ph,vy,a}; scene.add(petals.pts);
+}
+function updatePetals(dt,t){
+  if(!petals) return; const a=petals.a, ph=petals.ph, vy=petals.vy;
+  for(let i=0;i<vy.length;i++){ const k=i*3;
+    a[k+1]-=vy[i]*dt; a[k]+=Math.sin(t*0.8+ph[i])*0.6*dt; a[k+2]+=Math.cos(t*0.6+ph[i])*0.6*dt;
+    if(a[k+1]<heightAt(a[k],a[k+2])-0.5){ a[k]=player.pos.x+(Math.random()-0.5)*180; a[k+2]=player.pos.z+(Math.random()-0.5)*180; a[k+1]=38+Math.random()*10; }
+  }
+  petals.pts.geometry.attributes.position.needsUpdate=true;
+}
 
 /* ---------- NPCs ---------- */
 const npcObjs=[];
@@ -233,7 +385,7 @@ function makeNPC(npc){
   const head=new THREE.Mesh(new THREE.SphereGeometry(0.28,14,14),new THREE.MeshStandardMaterial({color:0xd8b48c,roughness:0.7})); head.position.y=2.4; grp.add(head);
   const hair=new THREE.Mesh(new THREE.SphereGeometry(0.3,10,10,0,TAU,0,Math.PI*0.6),new THREE.MeshStandardMaterial({color:0x1a1512})); hair.position.y=2.45; grp.add(hair);
   // name tag (sprite)
-  scene.add(grp); npcObjs.push({npc,grp});
+  scene.add(grp); npcObjs.push({npc,grp}); addCollider(x,z,0.85);  // NPCs are solid
   addInteractable({ id:"npc_"+npc.id, npcId:npc.id, pos:new THREE.Vector3(x,0,z), radius:3.4, prompt:"Speak with "+npc.name, enabled:true,
     onInteract:()=>talkTo(npc) });
 }
@@ -276,7 +428,7 @@ async function boot(){
   QUESTS=quests.quests; NPCS_D=npcs; ITEMS=items.items; TECHS=items.techniques; qiData=qi;
   data={elements,auras,realms}; setP(25);
 
-  scene=new THREE.Scene(); scene.background=new THREE.Color(0xc4d3d6); scene.fog=new THREE.FogExp2(0xc4d3d6,0.0045);
+  scene=new THREE.Scene(); scene.background=new THREE.Color(0xcfe1ea); scene.fog=new THREE.FogExp2(0xd4e4ec,0.0028);
   camera=new THREE.PerspectiveCamera(56,innerWidth/innerHeight,0.1,2000);
   makeLights();
   composer=new THREE.EffectComposer(renderer); composer.addPass(new THREE.RenderPass(scene,camera));
@@ -288,7 +440,7 @@ async function boot(){
     loadTextures(), loadHeroSprites(), loadModels()
   ]); setP(85);
 
-  makeSky(); makeTerrain(); buildWorld2(); makePlayer(); setP(95);
+  makeSky(); makeTerrain(); buildWorld2(); makePlayer(); makePetals(); setP(95);
   initQiEngine();
   bindInput(); initAudio();
   loadSave();                 // restores cards/aura/quest/inventory or leaves fresh
@@ -310,7 +462,11 @@ async function boot(){
   window.__qidev={ unlock:()=>unlockTechnique(), setQi:(v)=>{G.qi=G.qiMax=v;}, setEl:(e)=>{G.qiElement=e;},
     setRank:(r)=>{ if(G.cultivator)G.cultivator.realmIndex=r; }, face:(y)=>{player.yaw=y;},
     beastPos:()=>beast?[+beast.pos.x.toFixed(1),+beast.pos.z.toFixed(1),Math.round(beast.hp)]:null,
-    weaken:()=>{ for(const b of beasts) if(b.tutorial) b.hp=Math.min(b.hp,6); }, guard:()=>!!G.guard };
+    weaken:()=>{ for(const b of beasts) if(b.tutorial) b.hp=Math.min(b.hp,6); }, guard:()=>!!G.guard,
+    castCharged:(slot,ch)=>castTechnique(slot,ch), eff:()=>qiEfficiency(), colliders:()=>colliders.length,
+    pos:()=>[+player.pos.x.toFixed(2),+player.pos.z.toFixed(2)],
+    collideTest:(x,z)=>{ const p=new THREE.Vector3(x,0,z); resolveColliders(p); return [+p.x.toFixed(2),+p.z.toFixed(2)]; },
+    setCam:(p,d,y)=>{ camPitch=p; camDist=d; if(y!=null)player.yaw=y; } };
   window.__state=()=>({q:G.questIndex, quest:currentQuest()&&currentQuest().id, awakened:!!G.flags.awakened, aura:G.aura&&G.aura.tierId, dom:G.dominant, inv:{...G.inventory}, tech:[...G.techniques], hp:Math.round(G.hp), realm:G.cultivator?G.cultivator.realmIndex:-1, layer:G.cultivator?G.cultivator.layer:0, beastDead:!!(beast&&beast.dead), near:nearest?nearest.id:null, dlg:G.inDialogue, med:G.meditating});
   window.__beastPos=()=>beast?[+beast.pos.x.toFixed(1),+beast.pos.z.toFixed(1),beast.hp]:null;
   window.__step=(n=1)=>{ for(let i=0;i<n;i++) update(0.1, performance.now()/1000); };
@@ -442,8 +598,18 @@ function tickMeditation(dt){    // driven by update() — deterministic, no setI
    Q / 1 = Basic · 2 = Charged · 3 = Area · 4 = Guard · 5 = Dash.
    Breakthroughs raise the upgrade rank (0→2), so cultivation deepens every technique. */
 const QI_SLOTS=["basic","charged","area","defense","utility"];
+const AURA_ORDER={red:1,orange:2,yellow:3,green:4,teal:5,blue:6,purple:7,white:8};
 function qiElementOf(){ let el=G.dominant; if(!qiData||!el||!qiData.elements[el]) el="gold"; return el; } // light/dark fall back to gold until authored
 function qiRank(){ return clamp(G.cultivator?G.cultivator.realmIndex:0,0,2); }
+// Efficiency STAT — a gift of Aura (and deepened by realm): higher aura tier + realm = cheaper jutsu.
+// Returns the Qi-cost multiplier (<=1). Aura is potential, so it lowers the *cost* of channeling, not raw power.
+function qiEfficiency(){
+  const tier=G.aura&&G.aura.tier; const order=tier?(tier.order||AURA_ORDER[tier.id]||1):1;
+  const realm=G.cultivator?G.cultivator.realmIndex:0;
+  const reduce=clamp((order-1)*0.02 + realm*0.03, 0, 0.45);
+  return 1-reduce;
+}
+function qiEfficiencyPct(){ return Math.round((1-qiEfficiency())*100); }
 function initQiEngine(){
   qiEngine=new QiEngine({ THREE, scene, camera, data:qiData, textures:vfxTex,
     hooks:{
@@ -477,20 +643,45 @@ function showTechHUD(){ if(!G.qiElement||!qiData)return; const el=qiData.element
   $("tech").style.opacity="1";
   $("tech").innerHTML="<b>"+el.name+" Qi</b> · <b>Q</b>/1 "+t("basic")+" &nbsp;·&nbsp; 2 "+t("charged")+" &nbsp;·&nbsp; 3 "+t("area")+" &nbsp;·&nbsp; 4 "+t("defense")+" &nbsp;·&nbsp; 5 "+t("utility");
 }
-function castTechnique(slot){
-  slot=slot|0;
+function techIdForSlot(slot){ if(!G.qiElement) return null; return G.qiElement+"_"+(QI_SLOTS[slot|0]||"basic"); }
+function castTechnique(slot, charge){
+  slot=slot|0; charge=charge||0;
   if(!G.qiElement){ if(G.dominant) G.qiElement=qiElementOf(); else return; }
   if(!qiEngine||!qiData) return;
-  const techId=G.qiElement+"_"+(QI_SLOTS[slot]||"basic");
+  const techId=techIdForSlot(slot);
   const def=qiData.techniques[techId]; if(!def) return;
   if(!qiEngine.canCast(techId)){ return; }                 // on cooldown
-  if(G.qi<def.qiCost){ banner("Not enough Qi","Meditate to restore qi."); return; }
+  const ch = def.charge ? clamp(charge,0,1) : 0;
+  const cost = Math.max(1, Math.round(def.qiCost * (1+ch) * qiEfficiency()));  // charge costs more; efficiency refunds
+  if(G.qi<cost){ banner("Not enough Qi","Meditate to restore qi."); return; }
   const dir=new THREE.Vector3(Math.sin(player.yaw),0,Math.cos(player.yaw));
   const origin=player.pos.clone().add(dir.clone().multiplyScalar(1.7)).setY(player.pos.y+2.3);
-  const res=qiEngine.cast(techId, qiRank(), origin, dir);
-  if(res&&res.ok){ G.qi-=def.qiCost; refreshHUD();
+  const res=qiEngine.cast(techId, qiRank(), origin, dir, {charge:ch});
+  if(res&&res.ok){ G.qi-=cost; refreshHUD();
+    if(ch>0.15) banner(def.name, "Charged "+Math.round(ch*100)+"%");
     if(QUESTS[G.questIndex] && QUESTS[G.questIndex].trigger.type==="technique") advanceQuest("technique","any"); }
 }
+/* ---------- hold-to-charge (techniques with a `charge` field) ---------- */
+let charging=null;
+function startCharge(slot,techId,def){
+  if(charging) return;
+  if(G.inDialogue||G.inAwaken||G.meditating) return;
+  if(!qiEngine||!qiEngine.canCast(techId)) return;
+  const el=qiData.elements[def.element]||qiData.elements[G.qiElement];
+  const color=def.color||(el&&el.color)||"#ffffff";
+  const useHollow = def.element==="limitless" && def.tier==="area" && vfxTex.hollow;
+  const mat=new THREE.SpriteMaterial({map: useHollow?vfxTex.hollow:radialTex("rgba(255,255,255,1)","rgba(255,255,255,0)"),
+    color:new THREE.Color(color), blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.7});
+  const orb=new THREE.Sprite(mat); orb.scale.setScalar(0.3); orb.position.set(0,2.4,0);
+  player.group.add(orb);
+  charging={slot,techId,def,t:0,max:def.charge||1,orb};
+}
+function releaseCharge(){
+  if(!charging) return; const c=charging; charging=null;
+  if(c.orb){ player.group.remove(c.orb); c.orb.material.dispose(); }
+  castTechnique(c.slot, clamp(c.t/c.max,0,1));
+}
+function slotFromCode(code){ if(code==="KeyQ")return 0; if(code>="Digit1"&&code<="Digit5")return +code.slice(5)-1; return -1; }
 const bursts=[];
 function spawnBurst(origin,col){ const N=80,g=new THREE.BufferGeometry(),a=new Float32Array(N*3),v=[];
   for(let i=0;i<N;i++){ a[i*3]=origin.x;a[i*3+1]=origin.y;a[i*3+2]=origin.z; const dir=new THREE.Vector3((Math.random()-0.5),(Math.random()-0.2),(Math.random()-0.5)).normalize().multiplyScalar(3+Math.random()*7); v.push(dir); }
@@ -541,7 +732,8 @@ function refreshHUD(){
   else { tr.querySelector(".qt").textContent="Complete"; tr.querySelector(".qo").textContent="The tutorial is done — explore freely."; tr.querySelector(".qp").textContent=""; }
   $("vitals").querySelector(".hp>i").style.width=(G.hp/G.hpMax*100)+"%";
   $("vitals").querySelector(".qi>i").style.width=(G.qi/G.qiMax*100)+"%";
-  if(G.aura){ const r=data.realms.realms[G.cultivator.realmIndex]; $("badge").innerHTML="<b>"+G.aura.tier.id.toUpperCase()+"</b> aura · "+G.dominant+" · <b>"+r.name+"</b> L"+G.cultivator.layer; }
+  if(G.aura){ const r=data.realms.realms[G.cultivator.realmIndex]; const eff=qiEfficiencyPct();
+    $("badge").innerHTML="<b>"+G.aura.tier.id.toUpperCase()+"</b> aura · "+G.dominant+" · <b>"+r.name+"</b> L"+G.cultivator.layer+(eff>0?" · <b>Efficiency</b> −"+eff+"% Qi":""); }
   else $("badge").textContent="Unawakened — seek the Dao Tree";
 }
 function banner(k,t){ const b=$("banner"); b.querySelector(".bk").textContent=k; b.querySelector(".bt").textContent=t; b.style.opacity="1"; clearTimeout(banner._t); banner._t=setTimeout(()=>b.style.opacity="0",2200); }
@@ -577,12 +769,15 @@ function bindInput(){
   addEventListener("keydown",e=>{ if(BIND[e.code]){keys[BIND[e.code]]=1;} if(e.code==="ShiftLeft"||e.code==="ShiftRight")keys.run=1;
     if(e.code==="KeyE"){ interact(); }
     if(e.code==="Space"||e.code==="Enter"){ if(G.inDialogue){nextLine();} else if(G.inAwaken){closeAwakening();} else heroAttack(); e.preventDefault(); }
-    if(e.code==="KeyQ") castTechnique(0);
-    if(e.code>="Digit1" && e.code<="Digit5"){ castTechnique(+e.code.slice(5)-1); }
+    const sl=slotFromCode(e.code);
+    if(sl>=0){ const techId=techIdForSlot(sl); const def=techId&&qiData&&qiData.techniques[techId];
+      if(def&&def.charge){ if(!e.repeat) startCharge(sl,techId,def); }   // hold to charge
+      else castTechnique(sl); }
     if(e.code==="Digit6") toggleLimitless();
     if(e.code==="KeyI"){ const p=$("inv"); p.classList.toggle("on"); }
   });
-  addEventListener("keyup",e=>{ if(BIND[e.code])keys[BIND[e.code]]=0; if(e.code==="ShiftLeft"||e.code==="ShiftRight")keys.run=0; });
+  addEventListener("keyup",e=>{ if(BIND[e.code])keys[BIND[e.code]]=0; if(e.code==="ShiftLeft"||e.code==="ShiftRight")keys.run=0;
+    const sl=slotFromCode(e.code); if(sl>=0 && charging && charging.slot===sl) releaseCharge(); });
   const cv=renderer.domElement;
   cv.addEventListener("mousedown",e=>{drag=true;lx=e.clientX;ly=e.clientY;});
   addEventListener("mouseup",()=>drag=false);
@@ -628,12 +823,14 @@ function update(dt,t){
   if(G.meditating){ tickMeditation(dt); }
   // guard buff (defensive techniques): decay, regen, expire
   if(G.guard&&G.guard.time>0){ G.guard.time-=dt; if(G.guard.regen&&G.hp<G.hpMax){ G.hp=Math.min(G.hpMax,G.hp+G.guard.regen*dt); refreshHUD(); } if(G.guard.time<=0)G.guard=null; }
+  if(charging){ charging.t=Math.min(charging.max,charging.t+dt); const r=clamp(charging.t/charging.max,0,1);
+    if(charging.orb){ charging.orb.scale.setScalar(0.3+r*r*2.6); charging.orb.material.rotation+=dt*(2+r*4); charging.orb.material.opacity=0.55+0.4*r; } }
   const frozen = G.inDialogue||G.inAwaken||G.meditating;
   let moving=false;
   // dash (movement techniques) overrides normal locomotion for its brief window
   if(player.dashT>0 && !frozen){ player.dashT-=dt; player.pos.addScaledVector(player.dashDir,player.dashSpeed*dt);
     player.yaw=Math.atan2(player.dashDir.x,player.dashDir.z); player.speed=player.dashSpeed; moving=true;
-    player.pos.x=clamp(player.pos.x,-184,184); player.pos.z=clamp(player.pos.z,-184,184); player.pos.y=heightAt(player.pos.x,player.pos.z);
+    player.pos.x=clamp(player.pos.x,-184,184); player.pos.z=clamp(player.pos.z,-184,184); resolveColliders(player.pos); player.pos.y=heightAt(player.pos.x,player.pos.z);
     player.group.position.set(player.pos.x,player.pos.y,player.pos.z);
   } else {
   // movement
@@ -646,6 +843,7 @@ function update(dt,t){
   player.speed=player.vel.length();
   player.pos.addScaledVector(player.vel,dt);
   player.pos.x=clamp(player.pos.x,-184,184); player.pos.z=clamp(player.pos.z,-184,184);
+  resolveColliders(player.pos);
   player.pos.y=heightAt(player.pos.x,player.pos.z);
   }
   player.group.position.set(player.pos.x,player.pos.y+Math.sin(t*11)*0.05*Math.min(1,player.speed*0.15),player.pos.z);
@@ -665,7 +863,9 @@ function update(dt,t){
   camera.lookAt(player.pos.x,player.pos.y+2.4,player.pos.z);
   // sun follows
   sun.position.copy(SUN_DIR.clone().multiplyScalar(120)).add(player.pos); sun.target.position.copy(player.pos);
-  if(waterMat)waterMat.uniforms.t.value=t;
+  if(waterMat){ waterMat.uniforms.time.value=t; waterMat.uniforms.camPos.value.copy(camera.position); }
+  if(skyMat) skyMat.uniforms.t.value=t;
+  updatePetals(dt,t);
   if(daoMotes){ const p=daoMotes.geometry.attributes.position,a=p.array; for(let i=1;i<a.length;i+=3){a[i]+=dt*0.8; if(a[i]>34)a[i]=2;} p.needsUpdate=true; daoMotes.rotation.y+=dt*0.05; }
   // bursts
   for(let i=bursts.length-1;i>=0;i--){ const b=bursts[i]; b.life-=dt*1.6; const a=b.p.geometry.attributes.position.array;

@@ -8,7 +8,15 @@ never reroll.
 
 **Live:** https://fearless-rose-151.higgsfield.gg/ · Run locally: `python3 -m http.server` in this folder.
 
-**Controls:** WASD move · Shift run · E interact · click/Space attack · **Q or 1** basic Qi · **2** charged · **3** area · **4** defensive · **5** movement · **6** toggle the hidden **Limitless** kit · I bag.
+**Controls:** WASD move · Shift run · E interact · click/Space attack · **Q or 1** basic Qi · **2** charged (**hold to charge**) · **3** area · **4** defensive · **5** movement · **6** toggle the hidden **Limitless** kit (**hold 3 for Hollow Purple** to grow it) · I bag.
+
+## Visual + combat update
+- **Reflective water.** The valley now has a real **lily pond** (and deeper river) rendered with planar reflections (`vendor/Reflector.js`), animated wave normals, fresnel, sun glitter, depth-tinted colour and a shoreline foam band baked from a terrain-depth texture. Floating lily pads + lotus.
+- **Sky.** New atmospheric shader — zenith→horizon gradient, a sharp sun disk with Mie halo, and scrolling fbm clouds; fog tinted to the horizon so distant hills melt into haze. Drifting **sakura petals** for ambience.
+- **Hold-to-charge.** Any technique with a `charge` field (all Charged tiers + **Hollow Purple**) charges while held — a growing orb at the hand — and releases bigger: more damage, radius, knockback and light, for proportionally **more Qi**.
+- **Efficiency stat (from Aura).** Higher Aura tier + realm lowers every jutsu's Qi cost (shown in the HUD as `Efficiency −N% Qi`). Aura is *potential*, so it cheapens the channeling — it never adds raw power.
+- **Collision.** Buildings, caves, the Dao Tree, standing stones, rocks, NPCs and tree trunks are now solid (cylinder colliders with push-out); you can't walk through them.
+- **Honest gap:** this is browser WebGL, not the Ghost-of-Tsushima native reference — the fidelity ceiling (full volumetrics, SSR, GPU foliage) is the UE5 track; this is the grounded, reflective, atmospheric version of it.
 
 ## Audit (what existed, and the honest conflicts)
 The master prompt assumed one integrated project with Phase-4 systems and a giant Dao Tree in the

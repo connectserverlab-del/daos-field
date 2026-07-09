@@ -103,11 +103,21 @@ export class QiEngine {
   }
 
   /* ---------- cast ---------- */
-  cast(techId, rank, origin, dir) {
+  cast(techId, rank, origin, dir, opts) {
     const t = this.techAt(techId, rank || 0);
     if (!t) return { ok: false, reason: "unknown" };
     if (this.cooldowns[techId] > 0) return { ok: false, reason: "cooldown" };
     this.cooldowns[techId] = t.cooldown || 0.4;
+    // hold-to-charge scaling (0..1): bigger, harder-hitting, more knockback + a fiercer flash
+    const charge = opts && opts.charge ? Math.max(0, Math.min(1, opts.charge)) : 0;
+    t._charge = charge;
+    if (charge > 0) {
+      if (t.damage) t.damage *= 1 + charge;
+      if (t.radius) t.radius *= 1 + charge * 0.7;
+      if (t.knockback) t.knockback *= 1 + charge * 0.6;
+      if (t.light) t.light = Object.assign({}, t.light, { intensity: (t.light.intensity || 4) * (1 + charge * 0.9), range: (t.light.range || 10) * (1 + charge * 0.5) });
+      if (t.camera) t.camera = Object.assign({}, t.camera, { shake: (t.camera.shake || 0) * (1 + charge * 0.6) });
+    }
     dir = dir.clone().setY(0).normalize();
     const el = t._el;
     if (t.sound || (el && el.sound)) this._sfx(t.sound || el.sound);
@@ -136,14 +146,15 @@ export class QiEngine {
   /* ---------- projectiles ---------- */
   _spawnProjectile(origin, dir, t) {
     const T = this.THREE, el = t._el, pal = el.palette;
+    const cg = 1 + (t._charge || 0) * 0.9;   // charged bolts fly bigger
     const grp = new T.Group();
     const core = new T.Mesh(
-      new T.SphereGeometry(0.28 * (t.radius ? Math.min(1.6, t.radius / 2.4) : 1), 10, 10),
+      new T.SphereGeometry(0.28 * (t.radius ? Math.min(1.6, t.radius / 2.4) : 1) * cg, 12, 12),
       new T.MeshBasicMaterial({ color: new T.Color(pal.core.color), transparent: true, blending: T.AdditiveBlending, depthWrite: false })
     );
     grp.add(core);
     const halo = new T.Sprite(new T.SpriteMaterial({ map: this._tex(pal.core.tex), color: new T.Color(pal.core.color2), blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
-    halo.scale.setScalar(1.6); grp.add(halo);
+    halo.scale.setScalar(1.6 * cg); grp.add(halo);
     const pos = origin.clone(); grp.position.copy(pos); this.scene.add(grp);
     const light = new T.PointLight(new T.Color(el.color).getHex(), (t.light && t.light.intensity) || 4, (t.light && t.light.range) || 10);
     grp.add(light);
