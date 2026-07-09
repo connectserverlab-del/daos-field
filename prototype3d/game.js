@@ -30,7 +30,7 @@ function baseHeight(x, z){
   n += fbm(x*0.0075+11, z*0.0075+7)*15;              // rolling hills
   n += fbm(x*0.030, z*0.030)*3.2;                    // fine detail
   var r = Math.sqrt(x*x + z*z);
-  n += Math.pow(Math.min(r,980)/720, 2.4)*160;       // distant rim rises (pushed far out)
+  n += Math.pow(Math.min(r,1150)/1150, 3.0)*110;     // gentle rim — valley opens out, no looming walls
   var river = Math.exp(-(x*x)/(2*26*26));            // gaussian channel along z
   n -= river*10.0;
   return n;
@@ -125,30 +125,24 @@ function makeSky(){
       "varying vec3 vD; uniform vec3 top; uniform vec3 mid; uniform vec3 bot; uniform vec3 sun;"+
       "void main(){ float h=clamp(vD.y*0.5+0.5,0.0,1.0);"+
       "vec3 col = mix(bot, mid, smoothstep(0.32,0.5,h)); col = mix(col, top, smoothstep(0.5,0.9,h));"+
-      "float s = pow(max(dot(normalize(vD),normalize(sun)),0.0), 8.0);"+
-      "col += vec3(1.0,0.85,0.6)*s*0.6;"+
-      "float halo = pow(max(dot(normalize(vD),normalize(sun)),0.0), 2.0)*0.25;"+
-      "col += vec3(1.0,0.8,0.55)*halo;"+
+      "float sd = max(dot(normalize(vD),normalize(sun)),0.0);"+
+      "col += vec3(1.0,0.9,0.72)*pow(sd,80.0)*0.5;"+       // tight sun disc
+      "col += vec3(0.95,0.93,0.85)*pow(sd,6.0)*0.12;"+     // soft wide halo
+      "col = mix(col, vec3(0.86,0.9,0.96), 0.10);"+         // gentle atmospheric wash
       "gl_FragColor=vec4(col,1.0);}"
   });
-  sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 32, 16), mat);
+  sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 96, 48), mat);   // high-res so the gradient/sun-glow stays smooth (no facets)
   scene.add(sky);
-  // photoreal cloud band around the horizon (4K sky texture) over the gradient dome
-  if (tex.sky){
-    tex.sky.wrapS = THREE.RepeatWrapping; tex.sky.encoding = THREE.sRGBEncoding;
-    var band = new THREE.Mesh(new THREE.CylinderGeometry(1500, 1500, 820, 64, 1, true),
-      new THREE.MeshBasicMaterial({ map:tex.sky, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.5 }));
-    band.position.y = 150; scene.add(band);
-  }
-  // layered misty-mountain backdrop (C-drama atmospheric depth) sitting on the horizon
+  // layered misty-mountain backdrop (C-drama atmospheric depth) — far out so the
+  // painted peaks read as distant, hazy ridgelines sitting low on the horizon.
   if (tex.mist){
     tex.mist.wrapS = THREE.RepeatWrapping; tex.mist.encoding = THREE.sRGBEncoding;
-    var mb = new THREE.Mesh(new THREE.CylinderGeometry(1300, 1300, 360, 96, 1, true),
-      new THREE.MeshBasicMaterial({ map:tex.mist, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.9 }));
-    mb.position.y = 55; scene.add(mb);
-    var mb2 = new THREE.Mesh(new THREE.CylinderGeometry(900, 900, 260, 96, 1, true),
-      new THREE.MeshBasicMaterial({ map:tex.mist, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.55 }));
-    mb2.rotation.y = 1.7; mb2.position.y = 30; scene.add(mb2);
+    var mb = new THREE.Mesh(new THREE.CylinderGeometry(2350, 2350, 300, 96, 1, true),
+      new THREE.MeshBasicMaterial({ map:tex.mist, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.95 }));
+    mb.position.y = 12; scene.add(mb);
+    var mb2 = new THREE.Mesh(new THREE.CylinderGeometry(1850, 1850, 220, 96, 1, true),
+      new THREE.MeshBasicMaterial({ map:tex.mist, side:THREE.BackSide, fog:false, depthWrite:false, transparent:true, opacity:0.45 }));
+    mb2.rotation.y = 1.7; mb2.position.y = 6; scene.add(mb2);
   }
   // sun sprite (bloom picks it up as god-ray source)
   var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:radialTex("rgba(255,244,214,1)","rgba(255,220,150,0)"),
@@ -219,17 +213,17 @@ function makeMountains(){
   var snow = new THREE.MeshStandardMaterial({ color:0xeef4f8, roughness:1, flatShading:true });
   for (var i=0;i<28;i++){
     var a = (i/28)*TAU + hash2(i,3)*0.18;
-    var rad = 1550 + hash2(i,9)*360;             // far on the horizon → reads as distant, hazy range
-    var h = 420 + hash2(i,5)*460;
-    var geo = new THREE.ConeGeometry(240 + hash2(i,1)*180, h, 9 + (i%3), 4);
+    var rad = 1320 + hash2(i,9)*360;             // faint low ridge; the mist panorama carries the far peaks
+    var h = 90 + hash2(i,5)*130;
+    var geo = new THREE.ConeGeometry(160 + hash2(i,1)*120, h, 9 + (i%3), 4);
     var p = geo.attributes.position;
-    for (var j=0;j<p.count;j++){ p.setX(j,p.getX(j)+(hash2(j,i)-0.5)*46); p.setZ(j,p.getZ(j)+(hash2(j+7,i)-0.5)*46); }
+    for (var j=0;j<p.count;j++){ p.setX(j,p.getX(j)+(hash2(j,i)-0.5)*36); p.setZ(j,p.getZ(j)+(hash2(j+7,i)-0.5)*36); }
     geo.computeVertexNormals();
     var m = new THREE.Mesh(geo, mat);
-    m.position.set(Math.cos(a)*rad, h/2 - 70, Math.sin(a)*rad);
+    m.position.set(Math.cos(a)*rad, h/2 - 40, Math.sin(a)*rad);
     m.castShadow = false; scene.add(m);
-    var cap = new THREE.Mesh(new THREE.ConeGeometry(150+hash2(i,2)*90, h*0.4, 9, 1), snow);
-    cap.position.set(m.position.x, h - h*0.2 - 70, m.position.z); scene.add(cap);
+    var cap = new THREE.Mesh(new THREE.ConeGeometry(80+hash2(i,2)*50, h*0.34, 9, 1), snow);
+    cap.position.set(m.position.x, h - h*0.17 - 40, m.position.z); scene.add(cap);
   }
 }
 
@@ -304,7 +298,7 @@ function makeGrass(){
   makeGrassNear(blade);
 }
 /* dense near-field grass that follows the player — the lush cinematic foreground */
-var grassNear=null, GN=9000, GN_R=42, gnOffs=null;
+var grassNear=null, GN=12000, GN_R=54, gnOffs=null;
 function makeGrassNear(blade){
   grassNear=new THREE.InstancedMesh(blade, grassMaterial(), GN);
   grassNear.frustumCulled=false; grassNear.receiveShadow=true;
@@ -431,13 +425,13 @@ function forest(type, places){
   if(!places.length) return;
   var trunkGeo, canopyGeo, trunkCol, hueA, hueB, sat, lit, canWind;
   if(type==="pine"){ trunkGeo=new THREE.CylinderGeometry(0.05,0.13,1,6); trunkCol=0x3f2e1f; canopyGeo=coniferGeo(); hueA=0.28; hueB=0.34; sat=0.42; lit=0.22; canWind=0.05; }
-  else if(type==="autumn"){ trunkGeo=new THREE.CylinderGeometry(0.07,0.16,1,6); trunkCol=0x5a3a22; canopyGeo=broadleafGeo(); hueA=0.07; hueB=0.12; sat=0.62; lit=0.40; canWind=0.09; }
-  else if(type==="birch"){ trunkGeo=new THREE.CylinderGeometry(0.045,0.09,1,6); trunkCol=0xd8d2c4; canopyGeo=broadleafGeo(); hueA=0.20; hueB=0.26; sat=0.5; lit=0.44; canWind=0.09; }
-  else if(type==="sakura"){ trunkGeo=new THREE.CylinderGeometry(0.06,0.15,1,6); trunkCol=0x4a3526; canopyGeo=broadleafGeo(); hueA=0.92; hueB=0.99; sat=0.45; lit=0.76; canWind=0.09; }
+  else if(type==="autumn"){ trunkGeo=new THREE.CylinderGeometry(0.07,0.16,1,6); trunkCol=0x5a3a22; canopyGeo=broadleafGeo(); hueA=0.07; hueB=0.12; sat=0.6; lit=0.34; canWind=0.09; }
+  else if(type==="birch"){ trunkGeo=new THREE.CylinderGeometry(0.045,0.09,1,6); trunkCol=0xd8d2c4; canopyGeo=broadleafGeo(); hueA=0.22; hueB=0.28; sat=0.5; lit=0.38; canWind=0.09; }
+  else if(type==="sakura"){ trunkGeo=new THREE.CylinderGeometry(0.06,0.15,1,6); trunkCol=0x4a3526; canopyGeo=broadleafGeo(); hueA=0.94; hueB=0.99; sat=0.5; lit=0.62; canWind=0.09; }
   else { /* bamboo */ trunkGeo=new THREE.CylinderGeometry(0.045,0.06,1,6); trunkCol=0x9bab52; canopyGeo=bambooLeafGeo(); hueA=0.24; hueB=0.30; sat=0.5; lit=0.4; canWind=0.05; }
   trunkGeo.translate(0,0.5,0);
   var trunkMat=new THREE.MeshStandardMaterial({color:trunkCol,roughness:1,metalness:0});
-  var canopyMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,metalness:0,flatShading:type!=="birch"});
+  var canopyMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,metalness:0,flatShading:(type==="pine")});
   windify(canopyMat, canWind);
   var trunk=new THREE.InstancedMesh(trunkGeo, trunkMat, places.length);
   var canopy=new THREE.InstancedMesh(canopyGeo, canopyMat, places.length);
@@ -458,9 +452,9 @@ var BIOMES=[
   {type:"pine",   cx: 520, cz: 300, r:230, count:150, base:12, top:10},
   {type:"autumn", cx: 430, cz:-280, r:200, count:120, base:11, top:9},
   {type:"bamboo", cx:-300, cz: 320, r:150, count:120, base:10, top:8},
-  {type:"birch",  cx:-560, cz: 70,  r:180, count:110, base:12, top:9},
-  {type:"sakura", cx:  70, cz: -70, r:150, count:90,  base:12, top:8},
-  {type:"sakura", cx: 300, cz: 120, r:120, count:60,  base:12, top:8}
+  {type:"birch",  cx:-560, cz: 70,  r:180, count:110, base:11, top:8},
+  {type:"sakura", cx: 210, cz:-200, r:150, count:90,  base:10, top:6},
+  {type:"sakura", cx: 340, cz: 150, r:120, count:60,  base:10, top:6}
 ];
 function scatter(){
   trees=[];
@@ -477,12 +471,12 @@ function scatter(){
       buckets[bi.type].push({x:x,y:y,z:z,rot:hash2(i,bidx*13+7)*TAU,s:sc,seed:bidx*13+9});
     }
   });
-  // scattered lone trees across the whole valley
-  for(var i=0;i<260;i++){
+  // scattered lone trees across the whole valley (mostly pines — they read best low-poly)
+  for(var i=0;i<190;i++){
     var x=(hash2(i,71)-0.5)*2*PLAY, z=(hash2(i,33)-0.5)*2*PLAY, y=heightAt(x,z);
-    if(!ok(x,z,y)) continue;
-    var t=hash2(i,5)<0.7?"pine":"autumn";
-    buckets[t].push({x:x,y:y,z:z,rot:hash2(i,9)*TAU,s:9+hash2(i,4)*9,seed:44});
+    if(!ok(x,z,y) || Math.hypot(x,z-10)>0 && Math.hypot(x,z-10)<48) continue;   // keep the spawn/bridge clearing open
+    var t=hash2(i,5)<0.86?"pine":"autumn";
+    buckets[t].push({x:x,y:y,z:z,rot:hash2(i,9)*TAU,s:8+hash2(i,4)*6,seed:44});
   }
   Object.keys(buckets).forEach(function(k){ forest(k, buckets[k]); });
 
@@ -507,6 +501,7 @@ function loadModels(){
   GLTF=new THREE.GLTFLoader();
   loadHeroModel();
   loadBuildings();
+  loadWorldProps();
 }
 /* --- hero: load per-animation GLBs that share the Meshy skeleton, drive one mixer --- */
 function loadHeroModel(){
@@ -610,6 +605,70 @@ function placeBuildings(kind){
     if(a.fallbackMesh){ scene.remove(a.fallbackMesh); a.fallbackMesh=null; }
   });
 }
+/* ---------------- photoreal world props / landmarks (Higgsfield GLBs) ---------------- */
+var procBridge=null;
+function loadProp(file, opts, anchors){
+  if(!GLTF || !anchors || !anchors.length) return;
+  GLTF.load(MODELS_BASE+file, function(gltf){
+    var proto=gltf.scene;
+    proto.traverse(function(o){ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+    var box=new THREE.Box3().setFromObject(proto), size=new THREE.Vector3(); box.getSize(size);
+    var dim = opts.fit==="x" ? Math.max(size.x,size.z) : opts.fit==="max" ? Math.max(size.x,size.y,size.z) : size.y;
+    var s=opts.target/(dim||1); if(!isFinite(s)||s<=0)s=1;
+    proto.scale.multiplyScalar(s);
+    box.setFromObject(proto); var baseY=-box.min.y;
+    anchors.forEach(function(a,i){
+      var m=proto.clone(true);
+      var v = a.s || (opts.vary ? (0.75+hash2(i,5)*opts.vary) : 1);
+      if(v!==1) m.scale.multiplyScalar(v);
+      var gy = (opts.y!==undefined) ? opts.y : heightAt(a.x,a.z);
+      m.position.set(a.x, gy + baseY*(v!==1?v:1) + (opts.sink||0), a.z);
+      m.rotation.y = a.rot||0; scene.add(m);
+    });
+    if(opts.onLoad) opts.onLoad();
+  }, undefined, function(){ /* missing GLB → skip (procedural fallbacks remain) */ });
+}
+function loadWorldProps(){
+  if(!GLTF) return;
+  // monumental sacred Dao Tree — the region's landmark
+  loadProp("dao_tree.glb", {target:36, fit:"y", sink:-0.5}, [{x:-66, z:-54, rot:0.6}]);
+  // red arched bridge over the river (replaces the procedural one once loaded)
+  loadProp("bridge.glb", {target:34, fit:"x", y:WATER_Y+0.2, onLoad:function(){ if(procBridge){ scene.remove(procBridge); procBridge=null; } }}, [{x:0, z:6, rot:0}]);
+  // stone lanterns lining the main path
+  loadProp("lantern.glb", {target:2.9, fit:"y"}, lanternAnchors());
+  // ancient stele at its POI
+  loadProp("stele.glb", {target:4.4, fit:"y"}, [{x:-54, z:24, rot:0.3}]);
+  // scattered boulders (banks, cliffs, near the Dao Tree)
+  loadProp("boulder.glb", {target:3.6, fit:"max", vary:1.4}, boulderAnchors());
+  // lived-in props around the village
+  loadProp("jars.glb", {target:1.5, fit:"y"}, jarAnchors());
+  loadProp("herb_rack.glb", {target:2.7, fit:"y"}, [{x:VILLAGE.x-56, z:VILLAGE.z-24, rot:0.5}]);
+}
+function lanternAnchors(){
+  var out=[]; if(!PATH_DENS) return out; var pl=PATH_DENS[0];
+  for(var i=8;i<pl.length-3;i+=10){
+    var a=pl[i], b=pl[Math.min(pl.length-1,i+1)], dx=b[0]-a[0], dz=b[1]-a[1], len=Math.hypot(dx,dz)||1;
+    var nx=-dz/len, nz=dx/len, side=(Math.floor(i/10)%2)?1:-1;
+    out.push({x:a[0]+nx*side*(PATH_HALF+1.3), z:a[1]+nz*side*(PATH_HALF+1.3), rot:hash2(i,3)*TAU});
+  }
+  return out;
+}
+function boulderAnchors(){
+  var out=[];
+  for(var i=0;i<12;i++){ var x=(hash2(i,31)-0.5)*2*PLAY, z=(hash2(i,32)-0.5)*2*PLAY, y=heightAt(x,z);
+    if(y<WATER_Y||y>72||onPath(x,z)>0.4||Math.hypot(x-VILLAGE.x,z-VILLAGE.z)<VILLAGE.r) continue;
+    out.push({x:x,z:z,rot:hash2(i,4)*TAU}); }
+  for(var j=0;j<6;j++){ var sd=j%2?1:-1, bx=sd*(16+hash2(j,9)*8), bz=-80+hash2(j,8)*180, by=heightAt(bx,bz);
+    if(by<WATER_Y-0.5) continue; out.push({x:bx,z:bz,rot:hash2(j,7)*TAU}); }
+  out.push({x:-84,z:-70,rot:1.1});   // one resting near the Dao Tree grove
+  return out;
+}
+function jarAnchors(){
+  var out=[], houses=BUILD_ANCHORS.filter(function(a){return a.type==="house";});
+  for(var i=0;i<Math.min(4,houses.length);i++){ var h=houses[(i*2)%houses.length];
+    out.push({x:h.x+(hash2(i,2)-0.5)*7, z:h.z+3+hash2(i,3)*3, rot:hash2(i,5)*TAU}); }
+  return out;
+}
 /* ---------------- village (procedural dressing + building anchors) ---------------- */
 var BUILD_ANCHORS=[];
 function makeVillage(){
@@ -698,7 +757,7 @@ function makeBridge(){
       var rail=new THREE.Mesh(new THREE.BoxGeometry(span/segs+0.25,0.22,0.22),stone); rail.position.set(x,WATER_Y+3.85+arch,s*2.4); g.add(rail);
     }
   }
-  g.position.set(0,0,6); scene.add(g);
+  g.position.set(0,0,6); scene.add(g); procBridge=g;
 }
 
 /* ---------------- foliage billboards (hydrangea, ferns) ---------------- */
@@ -759,10 +818,12 @@ function makeParticles(){
   scene.add(petals);
   // ground mist layers
   var mtex = radialTex("rgba(210,225,230,0.5)","rgba(210,225,230,0)");
-  for (var k=0;k<7;k++){
-    var pl=new THREE.Mesh(new THREE.PlaneGeometry(220,220),
-      new THREE.MeshBasicMaterial({map:mtex,transparent:true,opacity:0.32,depthWrite:false}));
-    pl.rotation.x=-Math.PI/2; pl.position.set((Math.random()-0.5)*160, WATER_Y+2+Math.random()*5, (Math.random()-0.5)*160);
+  for (var k=0;k<16;k++){
+    var pl=new THREE.Mesh(new THREE.PlaneGeometry(240,240),
+      new THREE.MeshBasicMaterial({map:mtex,transparent:true,opacity:0.28,depthWrite:false,fog:false}));
+    pl.rotation.x=-Math.PI/2;
+    var mx=(Math.random()-0.5)*2*PLAY*0.8, mz=(Math.random()-0.5)*2*PLAY*0.8;
+    pl.position.set(mx, heightAt(mx,mz)+2+Math.random()*5, mz);
     pl.userData.spin=(Math.random()-0.5)*0.02; mistPlanes.push(pl); scene.add(pl);
   }
 }
@@ -1081,7 +1142,7 @@ function loadTextures(cb){
 
 /* ---------------- world build + boot ---------------- */
 function buildWorld(){
-  scene=new THREE.Scene(); scene.background=new THREE.Color(0xafcadf); scene.fog=new THREE.FogExp2(0xafcadf,0.0016);
+  scene=new THREE.Scene(); scene.background=new THREE.Color(0xafcadf); scene.fog=new THREE.FogExp2(0xafcadf,0.0019);
   camera=new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 3000);
   makeLights(); makeSky(); makeTerrain(); makeWater(); makeMountains();
   makePath(); makeGrass(); scatter(); makeVillage(); makeLotus(); makeBridge(); makeFoliage(); makeParticles(); makePOIs(); makePlayer();
@@ -1203,7 +1264,7 @@ function buildDevPanel(){
   $("devBtn").onclick=toggleDev; $("dpClose").onclick=toggleDev;
   $("dpAll").onclick=function(){ ELEMENTS.forEach(function(e){grantElement(e.id);}); if(!attunedId)setAttuned("fire"); refreshEls(); };
   $("dpClear").onclick=function(){ grantedSet={}; attunedId=null; rebuildGrantOrbs(); refreshHUD(); refreshEls(); };
-  var tps=[["Village",VILLAGE.x-14,VILLAGE.z+62],["Spawn",0,10],["Spirit Vein",46,-34],["Stele",-54,24],["Shrine",10,-96]];
+  var tps=[["Village",VILLAGE.x-14,VILLAGE.z+62],["Spawn",0,10],["Dao Tree",-44,-38],["Bridge",0,26],["Spirit Vein",46,-34],["Stele",-54,24],["Shrine",10,-96]];
   var th=$("dpTeleport"); tps.forEach(function(tp){ var b=document.createElement("span"); b.className="tp"; b.textContent=tp[0];
     b.onclick=function(){ if(scene) teleport(tp[1],tp[2]); }; th.appendChild(b); });
   $("dpSpeed").oninput=function(){ DEV.speedMul=parseFloat(this.value); };

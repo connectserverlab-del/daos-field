@@ -12,6 +12,11 @@ ambient guqin score.
   Replaces the old billboard sprite; falls back to the sprite if the GLBs are absent.
 - **3D village** — timber houses + a three-tier pagoda (Higgsfield GLBs) around a
   packed-earth plaza with a well, fences and hanging lanterns.
+- **Photoreal landmarks & props (Higgsfield GLBs)** — a monumental sacred **Dao
+  Tree**, a weathered **red arched bridge** over the river, **stone lanterns**
+  lining the path, an **ancient stele**, scattered **boulders**, and lived-in
+  village props (**ceramic jars**, **herb-drying rack**). Placed ecologically and
+  reachable via the dev-panel teleports.
 - **Elemental attacks channelled from the hand** — the attuned element's energy
   fires from the hero's hand bone on attack (never the feet), with a muzzle burst,
   spiralling trailers and a forward bolt.
