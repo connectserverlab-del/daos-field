@@ -284,6 +284,7 @@ function makeGrass(){
     if (y<WATER_Y+0.4 || y>66) continue;                 // no grass in water or high rock
     if (Math.abs(x) < 14 + hash2(i,11)*8) continue;      // keep the riverbank clearish
     if (onPath(x,z) > 0.5) continue;                     // don't grow through the trodden path
+    if (city && city.near(x,z)) continue; // ...or through the water-town plaza
     var r=Math.sqrt(x*x+z*z); var dens = r<AREA*0.72 ? 1 : hash2(i,44); if(dens<0.3) continue;
     d.position.set(x,y-0.06,z); d.rotation.y=hash2(i,3)*TAU;
     var s=0.75+hash2(i,8)*0.7; d.scale.set(s,s*(1.0+hash2(i,2)*0.55),s); d.updateMatrix();
@@ -319,7 +320,7 @@ function updateGrassNear(){
   var bx=Math.round(player.pos.x/1.5)*1.5, bz=Math.round(player.pos.z/1.5)*1.5, d=new THREE.Object3D();
   for(var i=0;i<GN;i++){
     var x=bx+gnOffs[i*2], z=bz+gnOffs[i*2+1], y=heightAt(x,z);
-    if((y<WATER_Y+0.4)||(y>66)||(Math.abs(x)<14)||(onPath(x,z)>0.5)){ d.position.set(x,-9999,z); d.scale.setScalar(0.0001); }
+    if((y<WATER_Y+0.4)||(y>66)||(Math.abs(x)<14)||(onPath(x,z)>0.5)||(city&&city.near(x,z))){ d.position.set(x,-9999,z); d.scale.setScalar(0.0001); }
     else { var s=0.72+hash2(i,8)*0.55; d.position.set(x,y-0.06,z); d.rotation.set(0,hash2(i,4)*TAU,0); d.scale.set(s,s*1.15,s); }
     d.updateMatrix(); grassNear.setMatrixAt(i,d.matrix);
   }
@@ -462,7 +463,8 @@ function scatter(){
   trees=[];
   var buckets={pine:[],autumn:[],birch:[],bamboo:[],sakura:[]};
   function ok(x,z,y){ return y>WATER_Y+1 && y<80 && Math.hypot(x-VILLAGE.x,z-VILLAGE.z)>VILLAGE.r*1.15
-      && Math.hypot(x,z-10)>30 && onPath(x,z)<0.35 && Math.sqrt(x*x+z*z)<PLAY*1.05; }   // keep the spawn clearing open
+      && Math.hypot(x,z-10)>30 && onPath(x,z)<0.35 && Math.sqrt(x*x+z*z)<PLAY*1.05
+      && !(city && city.near(x,z)); }   // keep the spawn clearing and water town open
   // clustered biome forests
   BIOMES.forEach(function(bi,bidx){
     for(var i=0;i<bi.count;i++){
@@ -486,7 +488,7 @@ function scatter(){
   var rockMat=new THREE.MeshStandardMaterial({map:tex.rock||null,color:0x9a948a,roughness:1,flatShading:true});
   for (var j=0;j<150;j++){
     var rx=(hash2(j,12)-0.5)*2*PLAY, rz=(hash2(j,90)-0.5)*2*PLAY; var ry=heightAt(rx,rz);
-    if (ry<WATER_Y || onPath(rx,rz)>0.4) continue;
+    if (ry<WATER_Y || onPath(rx,rz)>0.4 || (city && city.near(rx,rz))) continue;
     var rk=new THREE.Mesh(new THREE.IcosahedronGeometry(0.8+hash2(j,5)*2.8, 0), rockMat);
     rk.position.set(rx,ry+0.2,rz); rk.rotation.set(hash2(j,1)*TAU,hash2(j,2)*TAU,hash2(j,3)*TAU);
     rk.scale.set(1,0.6+hash2(j,7)*0.7,1); rk.castShadow=true; rk.receiveShadow=true; scene.add(rk);
@@ -783,7 +785,7 @@ function makeFoliage(){
   var flowers=[];
   for(var i=0;i<420;i++){
     var side=hash2(i,2)<0.5?-1:1, x=side*(15+hash2(i,3)*13), z=-95+hash2(i,4)*205, y=heightAt(x,z);
-    if(y<WATER_Y+0.1 || y>9 || onPath(x,z)>0.5) continue;
+    if(y<WATER_Y+0.1 || y>9 || onPath(x,z)>0.5 || (city && city.near(x,z))) continue;
     flowers.push({x:x,y:y-0.1,z:z,rot:hash2(i,5)*TAU,s:0.7+hash2(i,6)*0.7});
   }
   for(var v=0;v<70;v++){ var a=(v/70)*TAU, rr=VILLAGE.r*(0.6+hash2(v,9)*0.35);
@@ -795,7 +797,7 @@ function makeFoliage(){
   for(var f=0;f<420;f++){
     if(hash2(f,12)>0.42) continue;                        // sparse scatter
     var x2=(hash2(f,71)-0.5)*2*PLAY, z2=(hash2(f,33)-0.5)*2*PLAY, y2=heightAt(x2,z2);
-    if(y2<WATER_Y+1 || y2>70 || onPath(x2,z2)>0.4 || Math.hypot(x2-VILLAGE.x,z2-VILLAGE.z)<VILLAGE.r) continue;
+    if(y2<WATER_Y+1 || y2>70 || onPath(x2,z2)>0.4 || Math.hypot(x2-VILLAGE.x,z2-VILLAGE.z)<VILLAGE.r || (city && city.near(x2,z2))) continue;
     ferns.push({x:x2,y:y2-0.1,z:z2,rot:hash2(f,9)*TAU,s:0.6+hash2(f,4)*0.55});
   }
   placeFoliage(tex.fern, 2.4, ferns);
@@ -1050,7 +1052,9 @@ function update(dt, t){
   player.speed=player.vel.length();
   player.pos.addScaledVector(player.vel, dt);
   player.pos.x=clamp(player.pos.x,-PLAY,PLAY); player.pos.z=clamp(player.pos.z,-PLAY,PLAY);
-  var gy=heightAt(player.pos.x, player.pos.z);
+  var inCity = city && city.near(player.pos.x, player.pos.z);
+  if(inCity && !DEV.fly) city.resolve(player.pos);           // push out of buildings / canal
+  var gy = inCity ? city.groundAt(player.pos.x, player.pos.z) : heightAt(player.pos.x, player.pos.z);
   if(DEV.fly){ if(keys.up)flyH+=dt*24; if(keys.down)flyH-=dt*24; if(flyH<0)flyH=0; player.pos.y=gy+flyH; }
   else { flyH=0; player.pos.y=gy; }
   // place player, hover + bob + sway
@@ -1064,7 +1068,7 @@ function update(dt, t){
   var cx=player.pos.x - Math.sin(camYaw)*Math.cos(camPitch)*desiredDist;
   var cz=player.pos.z - Math.cos(camYaw)*Math.cos(camPitch)*desiredDist;
   var cy=player.pos.y + 4.3 + Math.sin(camPitch)*desiredDist*1.05;
-  var groundC=heightAt(cx,cz)+1.5; if(cy<groundC)cy=Math.min(groundC, player.pos.y+7.0);  // cap lift so the view stays behind, not overhead
+  var groundC=((city&&city.near(cx,cz))?city.groundAt(cx,cz):heightAt(cx,cz))+1.5; if(cy<groundC)cy=Math.min(groundC, player.pos.y+7.0);  // cap lift so the view stays behind, not overhead
   camera.position.lerp(new THREE.Vector3(cx,cy,cz), 1-Math.pow(0.0015,dt));
   var look=new THREE.Vector3(player.pos.x, player.pos.y+2.4, player.pos.z);
   camera.lookAt(look);
@@ -1130,7 +1134,10 @@ function loadTextures(cb){
   var items=[["grass","./assets/grass_ground.webp"],["rock","./assets/cliff_rock.webp"],
              ["dirt","./assets/dirt_ground.webp"],["sky","./assets/sky_dawn.webp"],
              ["blade","./assets/grass_blade.png"],["flower","./assets/flower_hydrangea.png"],
-             ["fern","./assets/fern_bush.png"],["mist","./assets/mist_mountains.webp"]];
+             ["fern","./assets/fern_bush.png"],["mist","./assets/mist_mountains.webp"],
+             ["roof","./assets/city_roof.webp"],["timber","./assets/city_timber.webp"],
+             ["paving","./assets/city_paving.webp"],["plaster","./assets/city_plaster.webp"],
+             ["lanternpaper","./assets/city_lantern.webp"]];
   var remaining=items.length;
   function done(){
     try{
@@ -1152,11 +1159,16 @@ function loadTextures(cb){
 }
 
 /* ---------------- world build + boot ---------------- */
+var city=null, inCityZone=false;
 function buildWorld(){
   scene=new THREE.Scene(); scene.background=new THREE.Color(0xafcadf); scene.fog=new THREE.FogExp2(0xafcadf,0.0019);
   camera=new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 3000);
-  makeLights(); makeSky(); makeTerrain(); makeWater(); makeMountains();
-  makePath(); makeGrass(); scatter(); makeVillage(); makeLotus(); makeBridge(); makeFoliage(); makeParticles(); makePOIs(); makePlayer();
+  makeLights(); makeSky(); makeTerrain(); makeWater(); makeMountains(); makePath();
+  // Yunhe Water Town district — built before scatter so grass/trees avoid the plaza
+  city = (window.DAO_CITY) ? DAO_CITY.build({THREE:THREE, scene:scene, tex:tex, heightAt:heightAt, hash2:hash2, WATER_Y:WATER_Y}) : null;
+  makeGrass(); scatter(); makeVillage(); makeLotus(); makeBridge(); makeFoliage(); makeParticles(); makePOIs();
+  if(city && city.pois) city.pois.forEach(function(p){ poiList.push({id:p.id, pos:p.pos, group:new THREE.Group(), active:false}); });
+  makePlayer();
   loadModels();
   makePost();
   camera.position.set(0, heightAt(0,20)+6, 22);
@@ -1278,7 +1290,7 @@ function buildDevPanel(){
   $("devBtn").onclick=toggleDev; $("dpClose").onclick=toggleDev;
   $("dpAll").onclick=function(){ ELEMENTS.forEach(function(e){grantElement(e.id);}); if(!attunedId)setAttuned("fire"); refreshEls(); };
   $("dpClear").onclick=function(){ grantedSet={}; attunedId=null; rebuildGrantOrbs(); refreshHUD(); refreshEls(); };
-  var tps=[["Village",VILLAGE.x-14,VILLAGE.z+62],["Spawn",0,10],["Dao Tree",-44,-38],["Bridge",0,26],["Spirit Vein",46,-34],["Stele",-54,24],["Shrine",10,-96]];
+  var tps=[["Village",VILLAGE.x-14,VILLAGE.z+62],["Spawn",0,10],["Water Town",0,-172],["Dao Tree",-44,-38],["Bridge",0,26],["Spirit Vein",46,-34],["Stele",-54,24],["Shrine",10,-96]];
   var th=$("dpTeleport"); tps.forEach(function(tp){ var b=document.createElement("span"); b.className="tp"; b.textContent=tp[0];
     b.onclick=function(){ if(scene) teleport(tp[1],tp[2]); }; th.appendChild(b); });
   $("dpSpeed").oninput=function(){ DEV.speedMul=parseFloat(this.value); };
