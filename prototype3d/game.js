@@ -43,6 +43,8 @@ function heightAt(x, z){
   if (k>0){ var plat = baseHeight(VILLAGE.x, VILLAGE.z) + 0.5; n = n*(1-k) + plat*k; }
   return n;
 }
+/* walkable ground: flat town plaza inside the river-city footprint, else the terrain */
+function groundHeight(x, z){ return (city && city.near(x, z)) ? city.groundAt(x, z) : heightAt(x, z); }
 
 /* ---------------- palette / config ---------------- */
 var SUN_DIR = new THREE.Vector3(-0.5, 0.55, -0.75).normalize();
@@ -1079,10 +1081,14 @@ function update(dt, t){
   updateModels(dt,t);
   updateVfx(dt,t);
   animParticles(dt,t);
+  if(city) city.update(dt,t);   // boats, lantern flicker, canal ripple, town petals
+  // location-name HUD swaps when you cross into the town
+  var nowInCity = !!(city && city.near(player.pos.x, player.pos.z));
+  if(nowInCity!==inCityZone){ inCityZone=nowInCity; var lc=$("loc"); if(lc){ lc.textContent=nowInCity?STR.cityName:STR.subtitle; lc.style.opacity="1"; } }
   // POI proximity
   nearPOI=null; var best=1e9;
   for(var i=0;i<poiList.length;i++){ var p=poiList[i]; var d=p.pos.distanceTo(player.pos);
-    if(p.group.userData.glow){ p.group.userData.glow.material.opacity=0.5+Math.sin(t*2+i)*0.3; }
+    if(p.group && p.group.userData.glow){ p.group.userData.glow.material.opacity=0.5+Math.sin(t*2+i)*0.3; }
     if(d<7 && d<best){ best=d; nearPOI=p; } }
   if(loreTimer>0){ loreTimer-=dt; if(loreTimer<=0)$("lore").style.opacity="0"; }
   else { $("prompt").style.opacity= nearPOI?"1":"0";
@@ -1130,6 +1136,11 @@ function loadTextures(cb){
     try{
       if(tex.grass&&tex.grass.image) tex.grassN=deriveNormal(tex.grass.image,1.7);
       if(tex.rock&&tex.rock.image)   tex.rockN =deriveNormal(tex.rock.image,2.6);
+      if(tex.roof&&tex.roof.image)   tex.roofN =deriveNormal(tex.roof.image,3.0);
+      if(tex.timber&&tex.timber.image) tex.timberN=deriveNormal(tex.timber.image,2.0);
+      if(tex.citystone&&tex.citystone.image) tex.citystoneN=deriveNormal(tex.citystone.image,2.4);
+      if(tex.paving&&tex.paving.image) tex.pavingN=deriveNormal(tex.paving.image,2.0);
+      if(tex.plaster&&tex.plaster.image) tex.plasterN=deriveNormal(tex.plaster.image,1.4);
     }catch(e){}
     cb();
   }
@@ -1153,6 +1164,9 @@ function buildWorld(){
   addEventListener("resize", onResize);
   addEventListener("blur", function(){paused=true;}); addEventListener("focus", function(){paused=false;clock.last=performance.now();});
   bindInput();
+  // lightweight debug/telemetry handle (harmless; used by automated smoke tests)
+  window.__DAO = { player:player, get city(){return city;}, groundHeight:groundHeight,
+    poiCount:function(){return poiList.length;}, teleport:function(x,z){ player.pos.set(x, groundHeight(x,z), z); } };
   requestAnimationFrame(function(t){clock.last=t; requestAnimationFrame(tick);});
 }
 function onResize(){
