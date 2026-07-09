@@ -28,6 +28,8 @@ function heightAt(x, z){
   n -= river*9.0;
   return n;
 }
+/* walkable ground: flat town plaza inside the river-city footprint, else the terrain */
+function groundHeight(x, z){ return (city && city.near(x, z)) ? city.groundAt(x, z) : heightAt(x, z); }
 
 /* ---------------- palette / config ---------------- */
 var SUN_DIR = new THREE.Vector3(-0.5, 0.55, -0.75).normalize();
@@ -42,6 +44,9 @@ var chosen = "human";
 
 /* ---------------- three basics ---------------- */
 var renderer, scene, camera, composer, bloom, fxaa, sun, sky, water, playerObj, auraRing;
+var city = null;              // Yunhe Water Town district (rivercity.js)
+var inCityZone = false;       // for the location-name HUD swap
+var CLAMP = 260;              // playable radius (extended when the town loads)
 var clock = { last: 0 };
 var tex = {};
 var grassMat, waterMat;
@@ -470,8 +475,10 @@ function update(dt, t){
   } else { player.vel.lerp(new THREE.Vector3(), 1-Math.pow(0.0001,dt)); }
   player.speed=player.vel.length();
   player.pos.addScaledVector(player.vel, dt);
-  player.pos.x=clamp(player.pos.x,-260,260); player.pos.z=clamp(player.pos.z,-260,260);
-  var gy=heightAt(player.pos.x, player.pos.z); player.pos.y=gy;
+  player.pos.x=clamp(player.pos.x,-CLAMP,CLAMP); player.pos.z=clamp(player.pos.z,-CLAMP,CLAMP);
+  // building / canal / prop collision inside the town
+  if(city && city.near(player.pos.x, player.pos.z)) city.resolve(player.pos);
+  var gy=groundHeight(player.pos.x, player.pos.z); player.pos.y=gy;
   // place player, hover + bob + sway
   var bob=Math.sin(t*11)*0.05*Math.min(1,player.speed*0.14);
   playerObj.position.set(player.pos.x, player.pos.y+bob, player.pos.z);
@@ -483,7 +490,7 @@ function update(dt, t){
   var cx=player.pos.x - Math.sin(camYaw)*Math.cos(camPitch)*desiredDist;
   var cz=player.pos.z - Math.cos(camYaw)*Math.cos(camPitch)*desiredDist;
   var cy=player.pos.y + 4.3 + Math.sin(camPitch)*desiredDist*1.05;
-  var groundC=heightAt(cx,cz)+1.5; if(cy<groundC)cy=groundC;
+  var groundC=groundHeight(cx,cz)+1.5; if(cy<groundC)cy=groundC;
   camera.position.lerp(new THREE.Vector3(cx,cy,cz), 1-Math.pow(0.0015,dt));
   var look=new THREE.Vector3(player.pos.x, player.pos.y+2.4, player.pos.z);
   camera.lookAt(look);
@@ -497,10 +504,14 @@ function update(dt, t){
   if(grassMat&&grassMat._wind)grassMat._wind.value=t;
   for(var ti=0;ti<trees.length;ti++){ var tg=trees[ti]; tg.rotation.z=tg.userData.baseZ+Math.sin(t*0.7+tg.userData.ph)*tg.userData.sway; }
   animParticles(dt,t);
+  if(city) city.update(dt,t);   // boats, lantern flicker, canal ripple, town petals
+  // location-name HUD swaps when you cross into the town
+  var nowInCity = !!(city && city.near(player.pos.x, player.pos.z));
+  if(nowInCity!==inCityZone){ inCityZone=nowInCity; var lc=$("loc"); if(lc){ lc.textContent=nowInCity?STR.cityName:STR.subtitle; lc.style.opacity="1"; } }
   // POI proximity
   nearPOI=null; var best=1e9;
   for(var i=0;i<poiList.length;i++){ var p=poiList[i]; var d=p.pos.distanceTo(player.pos);
-    if(p.group.userData.glow){ p.group.userData.glow.material.opacity=0.5+Math.sin(t*2+i)*0.3; }
+    if(p.group && p.group.userData.glow){ p.group.userData.glow.material.opacity=0.5+Math.sin(t*2+i)*0.3; }
     if(d<7 && d<best){ best=d; nearPOI=p; } }
   if(loreTimer>0){ loreTimer-=dt; if(loreTimer<=0)$("lore").style.opacity="0"; }
   else { $("prompt").style.opacity= nearPOI?"1":"0";
@@ -537,12 +548,21 @@ function deriveNormal(img, strength){
 function loadTextures(cb){
   var loader=new THREE.TextureLoader();
   var items=[["grass","./assets/grass_ground.webp"],["rock","./assets/cliff_rock.webp"],
-             ["dirt","./assets/dirt_ground.webp"],["sky","./assets/sky_dawn.webp"]];
+             ["dirt","./assets/dirt_ground.webp"],["sky","./assets/sky_dawn.webp"],
+             // Yunhe Water Town PBR material set (Higgsfield-generated, weathered)
+             ["roof","./assets/city_roof.webp"],["timber","./assets/city_timber.webp"],
+             ["citystone","./assets/city_stone.webp"],["paving","./assets/city_paving.webp"],
+             ["lanternpaper","./assets/city_lantern.webp"],["plaster","./assets/city_plaster.webp"]];
   var remaining=items.length;
   function done(){
     try{
       if(tex.grass&&tex.grass.image) tex.grassN=deriveNormal(tex.grass.image,1.7);
       if(tex.rock&&tex.rock.image)   tex.rockN =deriveNormal(tex.rock.image,2.6);
+      if(tex.roof&&tex.roof.image)   tex.roofN =deriveNormal(tex.roof.image,3.0);
+      if(tex.timber&&tex.timber.image) tex.timberN=deriveNormal(tex.timber.image,2.0);
+      if(tex.citystone&&tex.citystone.image) tex.citystoneN=deriveNormal(tex.citystone.image,2.4);
+      if(tex.paving&&tex.paving.image) tex.pavingN=deriveNormal(tex.paving.image,2.0);
+      if(tex.plaster&&tex.plaster.image) tex.plasterN=deriveNormal(tex.plaster.image,1.4);
     }catch(e){}
     cb();
   }
@@ -557,12 +577,24 @@ function loadTextures(cb){
 function buildWorld(){
   scene=new THREE.Scene(); scene.background=new THREE.Color(0xc4d3d6); scene.fog=new THREE.FogExp2(0xc4d3d6,0.0040);
   camera=new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 3000);
-  makeLights(); makeSky(); makeTerrain(); makeWater(); makeMountains(); makeGrass(); scatter(); makeParticles(); makePOIs(); makePlayer();
+  makeLights(); makeSky(); makeTerrain(); makeWater(); makeMountains(); makeGrass(); scatter(); makeParticles(); makePOIs();
+  // Yunhe Water Town — build the river-city district beyond the starter field
+  try {
+    if (window.DAO_CITY) {
+      city = window.DAO_CITY.build({ THREE:THREE, scene:scene, tex:tex, heightAt:heightAt, hash2:hash2, WATER_Y:WATER_Y });
+      for (var ci=0; ci<city.pois.length; ci++){ var cp=city.pois[ci]; poiList.push({ id:cp.id, pos:cp.pos, group:null, active:false }); }
+      CLAMP = 440;            // let the player walk north into the town
+    }
+  } catch(e){ if(window.console) console.warn("river-city build failed:", e); }
+  makePlayer();
   makePost();
   camera.position.set(0, heightAt(0,20)+6, 22);
   addEventListener("resize", onResize);
   addEventListener("blur", function(){paused=true;}); addEventListener("focus", function(){paused=false;clock.last=performance.now();});
   bindInput();
+  // lightweight debug/telemetry handle (harmless; used by automated smoke tests)
+  window.__DAO = { player:player, get city(){return city;}, groundHeight:groundHeight,
+    poiCount:function(){return poiList.length;}, teleport:function(x,z){ player.pos.set(x, groundHeight(x,z), z); } };
   requestAnimationFrame(function(t){clock.last=t; requestAnimationFrame(tick);});
 }
 function onResize(){
